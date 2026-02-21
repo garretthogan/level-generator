@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BSP Dungeon Generator</title>
+  <style>
+    .view { display: flex; flex-direction: column; height: 100%; }
+    .view.hidden { display: none !important; }
+    .hidden { display: none !important; }
+    #view-preview {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #000;
+    }
+    #view-preview .preview-canvas-container {
+      position: absolute;
+      inset: 0;
+    }
+    #view-preview .preview-canvas-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #view-preview .preview-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      gap: 12px;
+      cursor: pointer;
+    }
+    #view-preview .preview-overlay.hidden { display: none; }
+    #view-preview .preview-crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 12px;
+      height: 12px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    #view-preview .preview-crosshair::before,
+    #view-preview .preview-crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(0, 212, 255, 0.6);
+    }
+    #view-preview .preview-crosshair::before {
+      width: 2px;
+      height: 12px;
+      left: 5px;
+      top: 0;
+    }
+    #view-preview .preview-crosshair::after {
+      width: 12px;
+      height: 2px;
+      left: 0;
+      top: 5px;
+    }
+  </style>
+</head>
+<body class="tui">
+  <div id="view-generator" class="view">
+    <div id="app">
+      <div id="viewport">
+        <div id="dungeon-viewport" class="generator-viewport">
+          <canvas id="dungeon-canvas"></canvas>
+        </div>
+        <div id="arena-viewport" class="generator-viewport hidden">
+          <canvas id="arena-canvas"></canvas>
+        </div>
+      </div>
+
+      <div id="view-gallery" class="generator-viewport hidden" role="tabpanel" aria-hidden="true">
+        <div id="gallery-grid" class="gallery-grid" role="list"></div>
+      </div>
+
+      <div id="controls-area" class="collapsed">
+        <div class="controls-tabs" role="tablist" aria-label="Generator mode">
+          <button type="button" role="tab" id="tab-dungeon" aria-selected="true" aria-controls="tabpanel-dungeon">Dungeon</button>
+          <button type="button" role="tab" id="tab-arena" aria-selected="false" aria-controls="tabpanel-arena">Arena</button>
+          <button type="button" role="tab" id="tab-gallery" aria-selected="false" aria-controls="tabpanel-gallery">Gallery</button>
+        </div>
+        <div class="controls-area-header-row">
+          <button type="button" class="controls-area-header" aria-expanded="false" aria-label="Toggle controls panel">
+            <span class="controls-area-chevron">&#9660;</span>
+            Controls
+          </button>
+          <span id="status" class="hint" aria-live="polite" style="margin-left: auto; margin-right: var(--tui-gap);">Ready</span>
+          <span id="arena-status" class="hint hidden" aria-live="polite" style="margin-left: auto; margin-right: var(--tui-gap);">Ready</span>
+          <div class="dungeon-actions" style="display: flex; gap: var(--tui-gap);">
+            <button type="button" id="btn-generate" class="primary" title="Generate dungeon instantly (G)">Generate</button>
+            <button type="button" id="btn-debug" title="Step through generation (Space)">Debug</button>
+            <button type="button" id="btn-preview" title="Open 3D preview" disabled>Preview</button>
+            <button type="button" id="btn-export-glb" title="Download dungeon as GLB file" disabled>Export GLB</button>
+          </div>
+          <div class="arena-actions hidden" style="display: flex; gap: var(--tui-gap);">
+            <button type="button" id="arena-btn-generate" class="primary" title="Generate arena layout">Generate</button>
+            <button type="button" id="arena-btn-preview" title="Open 3D preview" disabled>Preview</button>
+            <button type="button" id="arena-btn-export-glb" title="Download arena as GLB file" disabled>Export GLB</button>
+          </div>
+          <div class="gallery-actions hidden" style="display: flex; align-items: center; gap: var(--tui-gap); flex-wrap: wrap;">
+            <fieldset class="gallery-type-inline" aria-label="Content type">
+              <label><input type="radio" name="gallery-type" id="gallery-type-dungeon" value="dungeon" checked /> Dungeon</label>
+              <label><input type="radio" name="gallery-type" id="gallery-type-arena" value="arena" /> Arena</label>
+            </fieldset>
+            <label for="gallery-count" class="gallery-count-label">Count</label>
+            <input type="number" id="gallery-count" min="1" max="20" value="5" aria-label="Number of items to generate" />
+            <button type="button" id="gallery-btn-generate" class="primary" title="Generate gallery thumbnails">Generate</button>
+            <span id="gallery-status" class="hint" aria-live="polite">Ready</span>
+            <button type="button" id="gallery-back-to-generator" class="gallery-back-link">Back to generator</button>
+          </div>
+        </div>
+        <div class="controls-area-content">
+          <div id="tabpanel-dungeon" role="tabpanel" aria-hidden="false">
+            <div class="controls-panels">
+              <div class="panel collapsed" id="debug-panel">
+                <button type="button" class="panel-header" aria-expanded="false" aria-label="Toggle debug panel">
+                  <span class="panel-chevron">&#9660;</span>
+                  Debug
+                </button>
+                <div class="panel-content" id="debug-controls">
+                  <div class="panel-actions">
+                    <button type="button" id="btn-step" title="Advance one step (Space)">Next Step</button>
+                    <button type="button" id="btn-play" title="Auto-advance steps (P)">Play</button>
+                    <button type="button" id="btn-pause" class="hidden" title="Pause auto-advance (P)">Pause</button>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-speed" title="Playback speed when stepping through generation (1x–4x).">Speed</label>
+                    <input type="range" id="param-speed" min="1" max="4" value="2" />
+                    <span id="val-speed">2x</span>
+                  </div>
+                  <p id="step-info" class="hint" style="margin: 0;"></p>
+                </div>
+              </div>
+              <div class="panel" id="params-panel">
+                <button type="button" class="panel-header">
+                  <span class="panel-chevron">&#9660;</span>
+                  Parameters
+                </button>
+                <div class="panel-content">
+                  <div class="control-row">
+                    <label for="param-width" title="Width of the dungeon grid in cells. Larger values give bigger layouts.">Width</label>
+                    <input type="range" id="param-width" min="30" max="120" value="80" />
+                    <span id="val-width">80</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-height" title="Height of the dungeon grid in cells. Larger values give bigger layouts.">Height</label>
+                    <input type="range" id="param-height" min="20" max="90" value="60" />
+                    <span id="val-height">60</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-depth" title="Maximum BSP recursion depth. Higher values create more subdivisions and usually more rooms.">Max Depth</label>
+                    <input type="range" id="param-depth" min="2" max="8" value="5" />
+                    <span id="val-depth">5</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-min-partition" title="Minimum partition size in cells. Splitting stops when a region is smaller than this.">Min Partition</label>
+                    <input type="range" id="param-min-partition" min="6" max="25" value="10" />
+                    <span id="val-min-partition">10</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-room-padding" title="Padding between each room edge and its partition boundary. Higher values make rooms smaller and leave more corridor space.">Room Padding</label>
+                    <input type="range" id="param-room-padding" min="1" max="5" value="2" />
+                    <span id="val-room-padding">2</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-min-room" title="Minimum width and height of each room in grid cells. Rooms are placed randomly within their partition subject to this size.">Min room size</label>
+                    <input type="range" id="param-min-room" min="3" max="20" value="8" />
+                    <span id="val-min-room">8</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-corridor" title="Width of corridors that connect rooms, in grid cells. Thicker corridors are easier to navigate.">Corridor Width</label>
+                    <input type="range" id="param-corridor" min="1" max="4" value="2" />
+                    <span id="val-corridor">2</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-exit-width" title="Width of exits on opposite sides of the dungeon (in cells). Two exits are placed at random on top/bottom or left/right.">Exit width</label>
+                    <input type="range" id="param-exit-width" min="1" max="8" value="2" />
+                    <span id="val-exit-width">2</span>
+                  </div>
+                  <div class="control-row">
+                    <label for="param-seed" title="Random seed for generation. Same seed plus same parameters always produces the same dungeon.">Seed</label>
+                    <input type="number" id="param-seed" value="42" min="0" />
+                    <button type="button" class="btn-random-seed" id="btn-random-seed" aria-label="Random seed" title="Random seed">&#8634;</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabpanel-arena" role="tabpanel" class="hidden" aria-hidden="true">
+            <div class="panel" id="arena-params-panel">
+              <button type="button" class="panel-header" aria-expanded="true" aria-label="Toggle arena parameters">
+                <span class="panel-chevron">&#9660;</span>
+                Parameters
+              </button>
+              <div class="panel-content">
+                <div class="control-row">
+                  <label for="arena-param-cols" title="Number of columns in the arena grid. With Rows, this sets the overall map size.">Cols</label>
+                  <input type="range" id="arena-param-cols" min="8" max="64" value="24" title="Number of columns in the arena grid. With Rows, this sets the overall map size." />
+                  <span id="arena-val-cols">24</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-rows" title="Number of rows in the arena grid. With Cols, this sets the overall map size.">Rows</label>
+                  <input type="range" id="arena-param-rows" min="8" max="64" value="24" title="Number of rows in the arena grid. With Cols, this sets the overall map size." />
+                  <span id="arena-val-rows">24</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-density" title="Random wall density (0–0.6). Higher values fill more cells with walls before smoothing; lower gives more open space.">Density</label>
+                  <input type="range" id="arena-param-density" min="0" max="60" step="1" value="28" title="Random wall density (0–0.6). Higher values fill more cells with walls before smoothing; lower gives more open space." />
+                  <span id="arena-val-density">0.28</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-building-count" title="Number of rectangular building blocks placed randomly. Each block is solid wall and adds cover.">Buildings</label>
+                  <input type="range" id="arena-param-building-count" min="0" max="40" value="8" title="Number of rectangular building blocks placed randomly. Each block is solid wall and adds cover." />
+                  <span id="arena-val-building-count">8</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-building-min" title="Minimum side length (in cells) for each building block. Buildings are rectangular within min–max size.">Building min size</label>
+                  <input type="range" id="arena-param-building-min" min="1" max="10" value="2" title="Minimum side length (in cells) for each building block. Buildings are rectangular within min–max size." />
+                  <span id="arena-val-building-min">2</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-building-max" title="Maximum side length (in cells) for each building block. Must be ≥ Building min size.">Building max size</label>
+                  <input type="range" id="arena-param-building-max" min="2" max="16" value="6" title="Maximum side length (in cells) for each building block. Must be ≥ Building min size." />
+                  <span id="arena-val-building-max">6</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-smoothing" title="Cellular automaton passes to smooth walls. More passes reduce noise and create cleaner boundaries.">Smoothing passes</label>
+                  <input type="range" id="arena-param-smoothing" min="0" max="6" value="2" title="Cellular automaton passes to smooth walls. More passes reduce noise and create cleaner boundaries." />
+                  <span id="arena-val-smoothing">2</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-corridor-width" title="Width of corridors that connect disconnected regions (in cells). Thicker corridors improve connectivity.">Corridor width</label>
+                  <input type="range" id="arena-param-corridor-width" min="1" max="4" value="1" title="Width of corridors that connect disconnected regions (in cells). Thicker corridors improve connectivity." />
+                  <span id="arena-val-corridor-width">1</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-exit-width" title="Width of exits carved at the map edges (in cells). Exits appear on opposite sides for flow.">Exit width</label>
+                  <input type="range" id="arena-param-exit-width" min="1" max="8" value="2" title="Width of exits carved at the map edges (in cells). Exits appear on opposite sides for flow." />
+                  <span id="arena-val-exit-width">2</span>
+                </div>
+                <div class="control-row">
+                  <label for="arena-param-candidates" title="Number of layout candidates to generate. The one with the best fitness (connectivity, fairness, etc.) is kept.">Candidates</label>
+                  <input type="range" id="arena-param-candidates" min="1" max="20" value="8" title="Number of layout candidates to generate. The one with the best fitness (connectivity, fairness, etc.) is kept." />
+                  <span id="arena-val-candidates">8</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabpanel-gallery" role="tabpanel" class="hidden" aria-hidden="true">
+            <div id="gallery-generator-params" class="gallery-generator-params" aria-label="Generator parameters for gallery"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-preview" class="view hidden" aria-hidden="true">
+    <div class="preview-canvas-container" id="preview-canvas-container"></div>
+    <div class="preview-crosshair" id="preview-crosshair" aria-hidden="true"></div>
+    <div class="preview-overlay" id="preview-overlay">
+      <p style="color: #f2f2f2; font-family: var(--tui-font, monospace); font-size: 14px; margin: 0;">Click to enter dungeon</p>
+      <p style="color: #9aa0a6; font-family: var(--tui-font, monospace); font-size: 12px; margin: 0;">WASD to move — Mouse to look — ESC to release</p>
+      <button type="button" id="preview-back-btn" aria-label="Back to generator" style="margin-top: 8px; background: none; border: none; color: #00d4ff; font-family: var(--tui-font, monospace); font-size: 12px; cursor: pointer; text-decoration: underline;">Back to generator</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
