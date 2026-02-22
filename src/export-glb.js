@@ -3,6 +3,7 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { generateDungeon } from './bsp/generate.js';
 import { buildDungeonMeshesForExport } from './preview/dungeon-mesh.js';
 import { buildArenaMeshesForExport } from './preview/arena-mesh.js';
+import { buildFloorPlanMeshesForExport } from './preview/floor-plan-mesh.js';
 
 /**
  * Set world-space UVs on a mesh so tiling textures work correctly in external editors.
@@ -60,6 +61,21 @@ function buildArenaGroupForExport(arenaResult) {
   return exportGroup;
 }
 
+function buildFloorPlanGroupForExport(plan) {
+  const { group } = buildFloorPlanMeshesForExport(plan);
+  const exportGroup = new THREE.Group();
+  exportGroup.name = 'floor-plan';
+  for (const child of group.children) {
+    if (!child.isMesh) continue;
+    const clone = child.clone();
+    clone.material = child.material.clone();
+    clone.material.name = child.name.startsWith('Floor') ? 'Floor' : 'Wall';
+    setWorldSpaceUVs(clone);
+    exportGroup.add(clone);
+  }
+  return exportGroup;
+}
+
 /**
  * Exports the current dungeon as a binary GLB file and triggers a download.
  * Each floor tile and each wall segment is a separate mesh (Floor_0_0, Floor_0_1, Wall_0, Wall_1, …)
@@ -102,6 +118,26 @@ export async function exportArenaAsGLB(arenaResult) {
   const a = document.createElement('a');
   a.href = url;
   a.download = `arena-export.glb`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Exports the current floor plan as a binary GLB file and triggers a download.
+ *
+ * @param {Object} plan - Floor plan from generateFloorPlan()
+ */
+export async function exportFloorPlanAsGLB(plan) {
+  const group = buildFloorPlanGroupForExport(plan);
+
+  const exporter = new GLTFExporter();
+  const result = await exporter.parseAsync(group, { binary: true });
+
+  const blob = new Blob([result], { type: 'model/gltf-binary' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `floor-plan-${plan.meta?.seed ?? 'export'}.glb`;
   a.click();
   URL.revokeObjectURL(url);
 }

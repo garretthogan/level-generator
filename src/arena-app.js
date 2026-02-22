@@ -4,6 +4,7 @@ import { createArenaRenderer } from './arena-renderer.js';
 import * as previewCoordinator from './preview/coordinator.js';
 import { ARENA_PARAM_SPEC, buildParamsFromSpec, syncConfigFromDOM, bindParamInputs } from './shared/config-dom.js';
 import { wirePanZoom } from './shared/canvas-pan-zoom.js';
+import { showGeneratorSpinner, hideGeneratorSpinner, runAfterSpinnerVisible } from './shared/loading-spinner.js';
 
 let arenaInited = false;
 
@@ -51,21 +52,25 @@ export function initArenaApp() {
     generating = true;
     ui.btnGenerate.disabled = true;
     if (ui.status) ui.status.textContent = 'Generating…';
+    showGeneratorSpinner();
 
-    syncConfigFromDOM(ARENA_PARAM_SPEC, options);
-    try {
-      lastResult = generateArena(options);
-      if (ui.status) ui.status.textContent = 'Ready';
-      if (ui.btnPreview) ui.btnPreview.disabled = false;
-      if (ui.btnExportGlb) ui.btnExportGlb.disabled = false;
-      draw();
-    } catch (err) {
-      if (ui.status) ui.status.textContent = 'Generation failed';
-      console.error('Arena generate failed:', err);
-    } finally {
-      generating = false;
-      ui.btnGenerate.disabled = false;
-    }
+    runAfterSpinnerVisible(() => {
+      syncConfigFromDOM(ARENA_PARAM_SPEC, options);
+      try {
+        lastResult = generateArena(options);
+        if (ui.status) ui.status.textContent = 'Ready';
+        if (ui.btnPreview) ui.btnPreview.disabled = false;
+        if (ui.btnExportGlb) ui.btnExportGlb.disabled = false;
+        draw();
+      } catch (err) {
+        if (ui.status) ui.status.textContent = 'Generation failed';
+        console.error('Arena generate failed:', err);
+      } finally {
+        generating = false;
+        ui.btnGenerate.disabled = false;
+        hideGeneratorSpinner();
+      }
+    });
   });
 
   if (ui.paramsHeader && ui.paramsPanel) {

@@ -75,16 +75,24 @@
         <div id="arena-viewport" class="generator-viewport hidden">
           <canvas id="arena-canvas"></canvas>
         </div>
+        <div id="floor-plan-viewport" class="generator-viewport hidden">
+          <canvas id="floor-plan-canvas"></canvas>
+        </div>
       </div>
 
       <div id="view-gallery" class="generator-viewport hidden" role="tabpanel" aria-hidden="true">
         <div id="gallery-grid" class="gallery-grid" role="list"></div>
       </div>
 
+      <div id="generator-loading-overlay" class="hidden" role="status" aria-live="polite" aria-label="Generating">
+        <span class="generator-loading-spinner" aria-hidden="true"></span>
+      </div>
+
       <div id="controls-area" class="collapsed">
         <div class="controls-tabs" role="tablist" aria-label="Generator mode">
           <button type="button" role="tab" id="tab-dungeon" aria-selected="true" aria-controls="tabpanel-dungeon">Dungeon</button>
           <button type="button" role="tab" id="tab-arena" aria-selected="false" aria-controls="tabpanel-arena">Arena</button>
+          <button type="button" role="tab" id="tab-floor-plan" aria-selected="false" aria-controls="tabpanel-floor-plan">Floor Plan</button>
           <button type="button" role="tab" id="tab-gallery" aria-selected="false" aria-controls="tabpanel-gallery">Gallery</button>
         </div>
         <div class="controls-area-header-row">
@@ -94,6 +102,7 @@
           </button>
           <span id="status" class="hint" aria-live="polite" style="margin-left: auto; margin-right: var(--tui-gap);">Ready</span>
           <span id="arena-status" class="hint hidden" aria-live="polite" style="margin-left: auto; margin-right: var(--tui-gap);">Ready</span>
+          <span id="floor-plan-status" class="hint hidden" aria-live="polite" style="margin-left: auto; margin-right: var(--tui-gap);">Ready</span>
           <div class="dungeon-actions" style="display: flex; gap: var(--tui-gap);">
             <button type="button" id="btn-generate" class="primary" title="Generate dungeon instantly (G)">Generate</button>
             <button type="button" id="btn-debug" title="Step through generation (Space)">Debug</button>
@@ -104,6 +113,11 @@
             <button type="button" id="arena-btn-generate" class="primary" title="Generate arena layout">Generate</button>
             <button type="button" id="arena-btn-preview" title="Open 3D preview" disabled>Preview</button>
             <button type="button" id="arena-btn-export-glb" title="Download arena as GLB file" disabled>Export GLB</button>
+          </div>
+          <div class="floor-plan-actions hidden" style="display: flex; gap: var(--tui-gap);">
+            <button type="button" id="floor-plan-btn-generate" class="primary" title="Generate floor plan">Generate</button>
+            <button type="button" id="floor-plan-btn-preview" title="Open 3D preview" disabled>Preview</button>
+            <button type="button" id="floor-plan-btn-export-glb" title="Download floor plan as GLB file" disabled>Export GLB</button>
           </div>
           <div class="gallery-actions hidden" style="display: flex; align-items: center; gap: var(--tui-gap); flex-wrap: wrap;">
             <fieldset class="gallery-type-inline" aria-label="Content type">
@@ -132,8 +146,8 @@
                     <button type="button" id="btn-pause" class="hidden" title="Pause auto-advance (P)">Pause</button>
                   </div>
                   <div class="control-row">
-                    <label for="param-speed" title="Playback speed when stepping through generation (1x–4x).">Speed</label>
-                    <input type="range" id="param-speed" min="1" max="4" value="2" />
+                    <label for="param-speed" title="Playback speed when stepping through generation (1x–8x).">Speed</label>
+                    <input type="range" id="param-speed" min="1" max="8" value="2" />
                     <span id="val-speed">2x</span>
                   </div>
                   <p id="step-info" class="hint" style="margin: 0;"></p>
@@ -147,43 +161,42 @@
                 <div class="panel-content">
                   <div class="control-row">
                     <label for="param-width" title="Width of the dungeon grid in cells. Larger values give bigger layouts.">Width</label>
-                    <input type="range" id="param-width" min="30" max="240" value="80" />
+                    <input type="range" id="param-width" min="20" max="400" value="80" />
                     <span id="val-width">80</span>
                   </div>
                   <div class="control-row">
                     <label for="param-height" title="Height of the dungeon grid in cells. Larger values give bigger layouts.">Height</label>
-                    <input type="range" id="param-height" min="20" max="180" value="60" />
+                    <input type="range" id="param-height" min="15" max="300" value="60" />
                     <span id="val-height">60</span>
                   </div>
                   <div class="control-row">
                     <label for="param-depth" title="Maximum BSP recursion depth. Higher values create more subdivisions and usually more rooms.">Max Depth</label>
-                    <input type="range" id="param-depth" min="2" max="8" value="5" />
+                    <input type="range" id="param-depth" min="2" max="12" value="5" />
                     <span id="val-depth">5</span>
                   </div>
                   <div class="control-row">
                     <label for="param-min-partition" title="Minimum partition size in cells. Splitting stops when a region is smaller than this.">Min Partition</label>
-                    <input type="range" id="param-min-partition" min="6" max="25" value="10" />
+                    <input type="range" id="param-min-partition" min="4" max="45" value="10" />
                     <span id="val-min-partition">10</span>
                   </div>
                   <div class="control-row">
                     <label for="param-room-padding" title="Padding between each room edge and its partition boundary. Higher values make rooms smaller and leave more corridor space.">Room Padding</label>
-                    <input type="range" id="param-room-padding" min="1" max="5" value="2" />
+                    <input type="range" id="param-room-padding" min="0" max="10" value="2" />
                     <span id="val-room-padding">2</span>
                   </div>
                   <div class="control-row">
                     <label for="param-min-room" title="Minimum width and height of each room in grid cells. Rooms are placed randomly within their partition subject to this size.">Min room size</label>
-                    <input type="range" id="param-min-room" min="3" max="20" value="8" />
+                    <input type="range" id="param-min-room" min="2" max="35" value="8" />
                     <span id="val-min-room">8</span>
                   </div>
                   <div class="control-row">
                     <label for="param-corridor" title="Width of corridors that connect rooms, in grid cells. Thicker corridors are easier to navigate.">Corridor Width</label>
-                    <input type="range" id="param-corridor" min="1" max="4" value="2" />
+                    <input type="range" id="param-corridor" min="1" max="8" value="2" />
                     <span id="val-corridor">2</span>
                   </div>
                   <div class="control-row">
                     <label for="param-seed" title="Random seed for generation. Same seed plus same parameters always produces the same dungeon.">Seed</label>
                     <input type="number" id="param-seed" value="42" min="0" />
-                    <button type="button" class="btn-random-seed" id="btn-random-seed" aria-label="Random seed" title="Random seed">&#8634;</button>
                   </div>
                 </div>
               </div>
@@ -198,53 +211,102 @@
               <div class="panel-content">
                 <div class="control-row">
                   <label for="arena-param-cols" title="Number of columns in the arena grid. With Rows, this sets the overall map size.">Cols</label>
-                  <input type="range" id="arena-param-cols" min="8" max="128" value="24" title="Number of columns in the arena grid. With Rows, this sets the overall map size." />
+                  <input type="range" id="arena-param-cols" min="8" max="256" value="24" title="Number of columns in the arena grid. With Rows, this sets the overall map size." />
                   <span id="arena-val-cols">24</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-rows" title="Number of rows in the arena grid. With Cols, this sets the overall map size.">Rows</label>
-                  <input type="range" id="arena-param-rows" min="8" max="128" value="24" title="Number of rows in the arena grid. With Cols, this sets the overall map size." />
+                  <input type="range" id="arena-param-rows" min="8" max="256" value="24" title="Number of rows in the arena grid. With Cols, this sets the overall map size." />
                   <span id="arena-val-rows">24</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-density" title="Random wall density (0–0.6). Higher values fill more cells with walls before smoothing; lower gives more open space.">Density</label>
-                  <input type="range" id="arena-param-density" min="0" max="60" step="1" value="28" title="Random wall density (0–0.6). Higher values fill more cells with walls before smoothing; lower gives more open space." />
+                  <input type="range" id="arena-param-density" min="0" max="85" step="1" value="28" title="Random wall density (0–0.85). Higher values fill more cells with walls before smoothing; lower gives more open space." />
                   <span id="arena-val-density">0.28</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-building-count" title="Number of rectangular building blocks placed randomly. Each block is solid wall and adds cover.">Buildings</label>
-                  <input type="range" id="arena-param-building-count" min="0" max="40" value="8" title="Number of rectangular building blocks placed randomly. Each block is solid wall and adds cover." />
+                  <input type="range" id="arena-param-building-count" min="0" max="80" value="8" title="Number of rectangular building blocks placed randomly. Each block is solid wall and adds cover." />
                   <span id="arena-val-building-count">8</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-building-min" title="Minimum side length (in cells) for each building block. Buildings are rectangular within min–max size.">Building min size</label>
-                  <input type="range" id="arena-param-building-min" min="1" max="10" value="2" title="Minimum side length (in cells) for each building block. Buildings are rectangular within min–max size." />
+                  <input type="range" id="arena-param-building-min" min="1" max="20" value="2" title="Minimum side length (in cells) for each building block. Buildings are rectangular within min–max size." />
                   <span id="arena-val-building-min">2</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-building-max" title="Maximum side length (in cells) for each building block. Must be ≥ Building min size.">Building max size</label>
-                  <input type="range" id="arena-param-building-max" min="2" max="16" value="6" title="Maximum side length (in cells) for each building block. Must be ≥ Building min size." />
+                  <input type="range" id="arena-param-building-max" min="2" max="32" value="6" title="Maximum side length (in cells) for each building block. Must be ≥ Building min size." />
                   <span id="arena-val-building-max">6</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-smoothing" title="Cellular automaton passes to smooth walls. More passes reduce noise and create cleaner boundaries.">Smoothing passes</label>
-                  <input type="range" id="arena-param-smoothing" min="0" max="6" value="2" title="Cellular automaton passes to smooth walls. More passes reduce noise and create cleaner boundaries." />
+                  <input type="range" id="arena-param-smoothing" min="0" max="12" value="2" title="Cellular automaton passes to smooth walls. More passes reduce noise and create cleaner boundaries." />
                   <span id="arena-val-smoothing">2</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-corridor-width" title="Width of corridors that connect disconnected regions (in cells). Thicker corridors improve connectivity.">Corridor width</label>
-                  <input type="range" id="arena-param-corridor-width" min="1" max="4" value="1" title="Width of corridors that connect disconnected regions (in cells). Thicker corridors improve connectivity." />
+                  <input type="range" id="arena-param-corridor-width" min="1" max="8" value="1" title="Width of corridors that connect disconnected regions (in cells). Thicker corridors improve connectivity." />
                   <span id="arena-val-corridor-width">1</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-exit-width" title="Width of exits carved at the map edges (in cells). Exits appear on opposite sides for flow.">Exit width</label>
-                  <input type="range" id="arena-param-exit-width" min="1" max="8" value="2" title="Width of exits carved at the map edges (in cells). Exits appear on opposite sides for flow." />
+                  <input type="range" id="arena-param-exit-width" min="1" max="16" value="2" title="Width of exits carved at the map edges (in cells). Exits appear on opposite sides for flow." />
                   <span id="arena-val-exit-width">2</span>
                 </div>
                 <div class="control-row">
                   <label for="arena-param-candidates" title="Number of layout candidates to generate. The one with the best fitness (connectivity, fairness, etc.) is kept.">Candidates</label>
-                  <input type="range" id="arena-param-candidates" min="1" max="20" value="8" title="Number of layout candidates to generate. The one with the best fitness (connectivity, fairness, etc.) is kept." />
+                  <input type="range" id="arena-param-candidates" min="1" max="40" value="8" title="Number of layout candidates to generate. The one with the best fitness (connectivity, fairness, etc.) is kept." />
                   <span id="arena-val-candidates">8</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabpanel-floor-plan" role="tabpanel" class="hidden" aria-hidden="true">
+            <div class="panel" id="floor-plan-params-panel">
+              <button type="button" class="panel-header" aria-expanded="true" aria-label="Toggle floor plan parameters">
+                <span class="panel-chevron">&#9660;</span>
+                Parameters
+              </button>
+              <div class="panel-content">
+                <div class="control-row">
+                  <label for="floor-plan-param-width" title="Width of the floor plan grid in cells.">Width</label>
+                  <input type="range" id="floor-plan-param-width" min="8" max="150" value="36" />
+                  <span id="floor-plan-val-width">36</span>
+                </div>
+                <div class="control-row">
+                  <label for="floor-plan-param-height" title="Height of the floor plan grid in cells.">Height</label>
+                  <input type="range" id="floor-plan-param-height" min="8" max="150" value="24" />
+                  <span id="floor-plan-val-height">24</span>
+                </div>
+                <div class="control-row">
+                  <label for="floor-plan-param-hallway-count" title="Number of hallway shapes (L/U/S/T).">Hallways</label>
+                  <input type="range" id="floor-plan-param-hallway-count" min="1" max="24" value="1" />
+                  <span id="floor-plan-val-hallway-count">1</span>
+                </div>
+                <div class="control-row">
+                  <label for="floor-plan-param-door-count" title="Number of room doors to place on hallways.">Doors</label>
+                  <input type="range" id="floor-plan-param-door-count" min="0" max="80" value="3" />
+                  <span id="floor-plan-val-door-count">3</span>
+                </div>
+                <div class="control-row">
+                  <label for="floor-plan-param-min-corridor" title="Minimum corridor width in cells.">Corridor min</label>
+                  <input type="range" id="floor-plan-param-min-corridor" min="2" max="40" value="3" />
+                  <span id="floor-plan-val-min-corridor">3</span>
+                </div>
+                <div class="control-row">
+                  <label for="floor-plan-param-max-corridor" title="Maximum corridor width in cells.">Corridor max</label>
+                  <input type="range" id="floor-plan-param-max-corridor" min="3" max="40" value="9" />
+                  <span id="floor-plan-val-max-corridor">9</span>
+                </div>
+                <div class="control-row">
+                  <label for="floor-plan-param-max-lights" title="Maximum number of light spawn points.">Max lights</label>
+                  <input type="range" id="floor-plan-param-max-lights" min="0" max="150" value="10" />
+                  <span id="floor-plan-val-max-lights">10</span>
+                </div>
+                <div class="control-row">
+                  <label for="floor-plan-param-seed" title="Random seed for generation.">Seed</label>
+                  <input type="number" id="floor-plan-param-seed" value="42" min="0" />
                 </div>
               </div>
             </div>

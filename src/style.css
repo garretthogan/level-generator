@@ -11,6 +11,7 @@ body.tui > #view-generator {
 }
 
 body.tui > #view-generator #app {
+  position: relative;
   height: 100%;
   min-height: 0;
 }
@@ -20,6 +21,43 @@ body.tui #viewport {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* Hide canvas/content while loading so only the spinner is visible */
+body.tui #app.generator-loading #viewport,
+body.tui #app.generator-loading #view-gallery {
+  visibility: hidden;
+}
+
+body.tui #app #generator-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+body.tui #generator-loading-overlay.hidden {
+  display: none !important;
+}
+
+body.tui .generator-loading-spinner {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--tui-line);
+  border-top-color: var(--tui-cyan);
+  border-radius: 50%;
+  animation: generator-spin 0.7s linear infinite;
+}
+
+@keyframes generator-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 body.tui .generator-viewport {
@@ -70,7 +108,8 @@ body.tui #controls-area label[title] {
 }
 
 #dungeon-canvas,
-#arena-canvas {
+#arena-canvas,
+#floor-plan-canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -81,15 +120,6 @@ body.tui #controls-area label[title] {
 
 #arena-canvas:active {
   cursor: grabbing;
-}
-
-.btn-random-seed {
-  flex-shrink: 0;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  font-size: 1.1rem;
-  line-height: 1;
 }
 
 /* Control panel header: wrap on narrow screens so all buttons are visible */
@@ -189,6 +219,32 @@ body.tui .gallery-card:hover {
 body.tui .gallery-card:focus-visible {
   outline: 2px solid var(--tui-cyan);
   outline-offset: 2px;
+}
+
+/* Toast: top center, dismiss on click or after 5s */
+body.tui .app-toast {
+  position: fixed;
+  top: var(--tui-gap-lg, 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  max-width: min(90vw, 420px);
+  padding: var(--tui-pad-2) var(--tui-pad-3);
+  background: var(--tui-controls-surface-bg, rgba(0, 0, 0, 0.9));
+  border: 2px solid var(--tui-danger);
+  color: var(--tui-fg);
+  font: inherit;
+  font-size: var(--tui-font-size);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  appearance: none;
+  text-align: left;
+}
+body.tui .app-toast:hover {
+  border-color: var(--tui-pink);
+}
+body.tui .app-toast:focus {
+  outline: none;
 }
 
 body.tui .gallery-card img {

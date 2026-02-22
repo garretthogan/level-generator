@@ -23,6 +23,10 @@ export async function openPreview(payload, returnToOverride) {
     returnTo = returnToOverride ?? 'arena';
     const { runArenaPreviewScene } = await import('./run-arena-preview.js');
     previewDestroy = runArenaPreviewScene(container, overlay, payload.arenaResult).destroy;
+  } else if (payload.type === 'floor-plan') {
+    returnTo = returnToOverride ?? 'floor-plan';
+    const { runFloorPlanPreviewScene } = await import('./run-floor-plan-preview.js');
+    previewDestroy = runFloorPlanPreviewScene(container, overlay, payload.plan).destroy;
   } else {
     return;
   }
@@ -58,6 +62,7 @@ export function closePreview() {
     } else {
       setGeneratorTab(returnTo);
       if (returnTo === 'arena') document.getElementById('arena-btn-preview')?.focus();
+      else if (returnTo === 'floor-plan') document.getElementById('floor-plan-btn-preview')?.focus();
       else document.getElementById('btn-preview')?.focus();
     }
   });

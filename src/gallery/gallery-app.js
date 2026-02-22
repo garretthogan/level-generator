@@ -5,6 +5,7 @@
 import { generateDungeonThumbnail } from './thumbnail.js';
 import { generateArenaThumbnail } from './thumbnail.js';
 import { DUNGEON_PARAM_SPEC, DUNGEON_SEED_INPUT_ID, ARENA_PARAM_SPEC, readConfigFromDOM } from '../shared/config-dom.js';
+import { showGeneratorSpinner, hideGeneratorSpinner, runAfterSpinnerVisible } from '../shared/loading-spinner.js';
 
 const MAX_ITEMS = 20;
 
@@ -86,31 +87,38 @@ export function initGalleryApp() {
     return Math.min(MAX_ITEMS, Math.max(1, isNaN(n) ? 5 : n));
   }
 
-  ui.btnGenerate.addEventListener('click', async () => {
+  ui.btnGenerate.addEventListener('click', () => {
     const type = getGalleryType();
     const count = getCount();
     ui.btnGenerate.disabled = true;
     if (ui.status) ui.status.textContent = 'Generating…';
+    showGeneratorSpinner();
     items = [];
 
-    const baseSeed = (Math.random() * 0xffffffff) | 0;
-    for (let i = 0; i < count; i++) {
+    runAfterSpinnerVisible(async () => {
       try {
-        if (type === 'dungeon') {
-          const config = { ...getDungeonConfigFromDOM(), seed: (baseSeed + i) | 0 };
-          items.push(generateDungeonThumbnail(config));
-        } else {
-          const options = getArenaOptionsFromDOM();
-          items.push(generateArenaThumbnail(options));
+        const baseSeed = (Math.random() * 0xffffffff) | 0;
+        for (let i = 0; i < count; i++) {
+          try {
+            if (type === 'dungeon') {
+              const config = { ...getDungeonConfigFromDOM(), seed: (baseSeed + i) | 0 };
+              items.push(generateDungeonThumbnail(config));
+            } else {
+              const options = getArenaOptionsFromDOM();
+              items.push(generateArenaThumbnail(options));
+            }
+          } catch (err) {
+            console.error('Gallery thumbnail failed:', err);
+          }
+          renderGrid(items, ui.grid);
         }
-      } catch (err) {
-        console.error('Gallery thumbnail failed:', err);
+      } finally {
+        hideGeneratorSpinner();
       }
-      renderGrid(items, ui.grid);
-    }
 
-    ui.btnGenerate.disabled = false;
-    if (ui.status) ui.status.textContent = items.length ? `Ready (${items.length} items)` : 'Ready';
+      ui.btnGenerate.disabled = false;
+      if (ui.status) ui.status.textContent = items.length ? `Ready (${items.length} items)` : 'Ready';
+    });
   });
 
   ui.typeDungeon?.addEventListener('change', syncGalleryGeneratorPanelVisibility);

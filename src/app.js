@@ -4,6 +4,7 @@ import { createRenderer } from './renderer.js';
 import * as previewCoordinator from './preview/coordinator.js';
 import { DUNGEON_PARAM_SPEC, DUNGEON_SEED_INPUT_ID, buildParamsFromSpec, syncConfigFromDOM, bindParamInputs } from './shared/config-dom.js';
 import { wirePanZoom } from './shared/canvas-pan-zoom.js';
+import { showGeneratorSpinner, hideGeneratorSpinner, runAfterSpinnerVisible } from './shared/loading-spinner.js';
 
 const State = Object.freeze({
   IDLE: 'idle',
@@ -46,9 +47,14 @@ export function initApp() {
     ui.seedInput.value = config.seed;
   }
 
+  function randomizeSeed() {
+    config.seed = (Math.floor(Math.random() * 0x7fffffff) - 1) | 0;
+    if (ui.seedInput) ui.seedInput.value = config.seed;
+  }
+
   function generateInstant() {
     stopPlay();
-    advanceSeed();
+    randomizeSeed();
     steps = generateDungeon(config);
     stepIndex = steps.length - 1;
     transition(State.COMPLETE);
@@ -227,19 +233,22 @@ export function initApp() {
     ui.seedInput.addEventListener('input', () => {
       config.seed = parseInt(ui.seedInput.value, 10) || 0;
     });
-    document.querySelectorAll('.btn-random-seed').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        config.seed = Math.floor(Math.random() * 0x7fffffff) - 1;
-        generateInstant();
-      });
-    });
 
     ui.speedInput.addEventListener('input', () => {
       ui.speedDisplay.textContent = `${ui.speedInput.value}x`;
       if (state === State.PLAYING) restartPlayTimer();
     });
 
-    ui.btnGenerate.addEventListener('click', generateInstant);
+    ui.btnGenerate.addEventListener('click', () => {
+      showGeneratorSpinner();
+      runAfterSpinnerVisible(() => {
+        try {
+          generateInstant();
+        } finally {
+          hideGeneratorSpinner();
+        }
+      });
+    });
     ui.btnDebug.addEventListener('click', startDebug);
     ui.btnPreview.addEventListener('click', openPreview);
     ui.btnExportGlb.addEventListener('click', exportGlb);
