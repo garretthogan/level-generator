@@ -116,28 +116,28 @@ function exitStubSegment(exit, w, h, allRects) {
       const stub = { x: exit.x, y: 0, width: span, height: depth };
       if (allRects.some((r) => rectsIntersect(stub, r))) return stub;
     }
-    return { x: exit.x, y: 0, width: span, height: Math.min(5, h) };
+    return { x: exit.x, y: 0, width: span, height: h };
   }
   if (exit.side === 's') {
     for (let depth = 1; depth <= maxExtend; depth++) {
       const stub = { x: exit.x, y: h - depth, width: span, height: depth };
       if (allRects.some((r) => rectsIntersect(stub, r))) return stub;
     }
-    return { x: exit.x, y: h - Math.min(5, h), width: span, height: Math.min(5, h) };
+    return { x: exit.x, y: 0, width: span, height: h };
   }
   if (exit.side === 'w') {
     for (let depth = 1; depth <= maxExtend; depth++) {
       const stub = { x: 0, y: exit.z, width: depth, height: span };
       if (allRects.some((r) => rectsIntersect(stub, r))) return stub;
     }
-    return { x: 0, y: exit.z, width: Math.min(5, w), height: span };
+    return { x: 0, y: exit.z, width: w, height: span };
   }
   if (exit.side === 'e') {
     for (let depth = 1; depth <= maxExtend; depth++) {
       const stub = { x: w - depth, y: exit.z, width: depth, height: span };
       if (allRects.some((r) => rectsIntersect(stub, r))) return stub;
     }
-    return { x: w - Math.min(5, w), y: exit.z, width: Math.min(5, w), height: span };
+    return { x: 0, y: exit.z, width: w, height: span };
   }
   return null;
 }

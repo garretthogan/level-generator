@@ -79,6 +79,21 @@ function regionCenter(cells) {
   }
 }
 
+/** Fill open cells that are not in the largest connected component so no orphan holes remain. */
+function fillDisconnectedOpenCells(grid) {
+  const regions = floodFillRegions(grid)
+  if (regions.length <= 1) return
+  const largest = regions.reduce((a, b) => (a.length >= b.length ? a : b))
+  const inLargest = new Set(largest.map(([x, z]) => `${x},${z}`))
+  const cols = grid.length
+  const rows = grid[0].length
+  for (let x = 0; x < cols; x++) {
+    for (let z = 0; z < rows; z++) {
+      if (grid[x][z] === 0 && !inLargest.has(`${x},${z}`)) grid[x][z] = 1
+    }
+  }
+}
+
 function carveCell(grid, x, z, width = 1) {
   const cols = grid.length
   const rows = grid[0].length
@@ -393,6 +408,7 @@ function buildCandidate(options) {
     }
   }
 
+  fillDisconnectedOpenCells(grid)
   regions = floodFillRegions(grid)
   const openCells = []
   for (let x = 0; x < cols; x++) {
@@ -485,8 +501,8 @@ export function generateArena(options = {}) {
   } = options
 
   const safe = {
-    cols: clamp(cols, 8, 64),
-    rows: clamp(rows, 8, 64),
+    cols: clamp(cols, 8, 128),
+    rows: clamp(rows, 8, 128),
     density: clamp(density, 0, 0.6),
     buildingCount: clamp(buildingCount, 0, 40),
     buildingMinSize: clamp(buildingMinSize, 1, 10),
