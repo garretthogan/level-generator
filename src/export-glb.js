@@ -1,85 +1,69 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { generateDungeon } from './bsp/generate.js';
-import { buildDungeonMeshes } from './preview/dungeon-mesh.js';
-import { buildArenaMeshes } from './preview/arena-mesh.js';
+import { buildDungeonMeshesForExport } from './preview/dungeon-mesh.js';
+import { buildArenaMeshesForExport } from './preview/arena-mesh.js';
 
 /**
- * Clean geometry for export: weld duplicate vertices (fixes z-fighting and shading in
- * Unreal/other engines) and set world-space UVs so tiling textures work correctly.
+ * Set world-space UVs on a mesh so tiling textures work correctly in external editors.
  * @param {THREE.Mesh} mesh
  */
-function prepareMeshForExport(mesh) {
+function setWorldSpaceUVs(mesh) {
   const geo = mesh.geometry;
   if (!geo?.attributes?.position) return;
-  const cleaned = mergeVertices(geo, 1e-6);
-  if (cleaned !== geo) {
-    geo.dispose();
-    mesh.geometry = cleaned;
-  }
-  const pos = mesh.geometry.attributes.position;
+  const pos = geo.attributes.position;
   const count = pos.count;
   const uvs = new Float32Array(count * 2);
   for (let i = 0; i < count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    uvs[i * 2] = x;
-    uvs[i * 2 + 1] = z;
+    uvs[i * 2] = pos.getX(i);
+    uvs[i * 2 + 1] = pos.getZ(i);
   }
-  mesh.geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  if (mesh.geometry.attributes.uv2) mesh.geometry.deleteAttribute('uv2');
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  if (geo.attributes.uv2) geo.deleteAttribute('uv2');
 }
 
 /**
- * Builds a Three.js group containing only the dungeon geometry (floors and walls)
- * for export. Geometry is cleaned (merged vertices, world-space UVs) for Unreal/other engines.
+ * Builds a Three.js group with one mesh per floor tile and per wall segment
+ * so each piece can be edited individually in another editor.
  */
 function buildDungeonGroupForExport(steps, config) {
-  const { group } = buildDungeonMeshes(steps, config);
+  const { group } = buildDungeonMeshesForExport(steps, config);
   const exportGroup = new THREE.Group();
   exportGroup.name = 'dungeon';
-  let idx = 0;
   for (const child of group.children) {
     if (!child.isMesh) continue;
     const clone = child.clone();
     clone.material = child.material.clone();
-    clone.material.name = idx === 0 ? 'Floor' : 'Wall';
-    clone.name = idx === 0 ? 'Floor' : 'Walls';
-    prepareMeshForExport(clone);
+    clone.material.name = child.name.startsWith('Floor') ? 'Floor' : 'Wall';
+    setWorldSpaceUVs(clone);
     exportGroup.add(clone);
-    idx++;
   }
   return exportGroup;
 }
 
 /**
- * Builds a Three.js group containing only the arena geometry (floors and walls)
- * for export. Geometry is cleaned (merged vertices, world-space UVs) for Unreal/other engines.
+ * Builds a Three.js group with one mesh per floor tile and per wall segment
+ * so each piece can be edited individually in another editor.
  */
 function buildArenaGroupForExport(arenaResult) {
-  const { group } = buildArenaMeshes(arenaResult);
+  const { group } = buildArenaMeshesForExport(arenaResult);
   const exportGroup = new THREE.Group();
   exportGroup.name = 'arena';
-  let idx = 0;
   for (const child of group.children) {
     if (!child.isMesh) continue;
     const clone = child.clone();
     clone.material = child.material.clone();
-    clone.material.name = idx === 0 ? 'Floor' : 'Wall';
-    clone.name = idx === 0 ? 'Floor' : 'Walls';
-    prepareMeshForExport(clone);
+    clone.material.name = child.name.startsWith('Floor') ? 'Floor' : 'Wall';
+    setWorldSpaceUVs(clone);
     exportGroup.add(clone);
-    idx++;
   }
   return exportGroup;
 }
 
 /**
  * Exports the current dungeon as a binary GLB file and triggers a download.
- * Uses the same generation as the 3D preview (buildDungeonMeshes).
- * Export is prepared for Unreal: merged vertices (no z-fighting), world-space UVs (tiling textures),
- * and named materials (Floor, Wall). In Unreal: 1 unit = 1 meter; use Import scale 100 if your project uses cm.
+ * Each floor tile and each wall segment is a separate mesh (Floor_0_0, Floor_0_1, Wall_0, Wall_1, …)
+ * so you can select and edit individual pieces in Unreal, Blender, etc. Materials are named Floor / Wall.
  *
  * @param {Object} config - Dungeon config (dungeonWidth, seed, etc.)
  * @param {Array} steps - Generated steps from generateDungeon(config); if omitted, generates from config
@@ -102,8 +86,8 @@ export async function exportDungeonAsGLB(config, steps = null) {
 
 /**
  * Exports the current arena as a binary GLB file and triggers a download.
- * Uses the same build as the 3D preview (buildArenaMeshes). Export is prepared for Unreal
- * (merged vertices, world-space UVs, named materials). In Unreal: 1 unit = 1 meter; use scale 100 if using cm.
+ * Each floor tile and each wall segment is a separate mesh (Floor_0_0, Wall_0, …)
+ * so you can select and edit individual pieces in Unreal, Blender, etc. Materials are named Floor / Wall.
  *
  * @param {Object} arenaResult - Result from generateArena(options) (grids, spawns, flags, etc.)
  */

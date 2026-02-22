@@ -162,3 +162,77 @@ function buildRoomLights(rooms, offsetX, offsetZ) {
     return light;
   });
 }
+
+/**
+ * Build dungeon geometry as separate meshes (one per floor tile, one per wall segment)
+ * for GLB export so each piece can be edited individually in another editor.
+ * Returns only the group with mesh children; no lights.
+ */
+export function buildDungeonMeshesForExport(steps, config) {
+  const { dungeonWidth, dungeonHeight } = config;
+  const grid = buildFloorGrid(steps, dungeonWidth, dungeonHeight);
+  const offsetX = -dungeonWidth / 2;
+  const offsetZ = -dungeonHeight / 2;
+
+  const group = new THREE.Group();
+  group.name = 'dungeon';
+
+  const tileGeo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
+  for (let y = 0; y < dungeonHeight; y++) {
+    for (let x = 0; x < dungeonWidth; x++) {
+      if (!grid[y][x]) continue;
+      const geo = tileGeo.clone();
+      geo.translate(x + 0.5 + offsetX, -FLOOR_THICKNESS / 2, y + 0.5 + offsetZ);
+      const mesh = new THREE.Mesh(geo, FLOOR_MATERIAL);
+      mesh.name = `Floor_${y}_${x}`;
+      group.add(mesh);
+    }
+  }
+  tileGeo.dispose();
+
+  const wallNS = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
+  const wallEW = new THREE.BoxGeometry(WALL_THICKNESS, WALL_HEIGHT, 1);
+  let wallIndex = 0;
+  for (let y = 0; y < dungeonHeight; y++) {
+    for (let x = 0; x < dungeonWidth; x++) {
+      if (!grid[y][x]) continue;
+
+      const cx = x + 0.5 + offsetX;
+      const cz = y + 0.5 + offsetZ;
+      const wy = WALL_HEIGHT / 2;
+
+      if (y === 0 || !grid[y - 1][x]) {
+        const g = wallNS.clone();
+        g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+      if (y === dungeonHeight - 1 || !grid[y + 1][x]) {
+        const g = wallNS.clone();
+        g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+      if (x === 0 || !grid[y][x - 1]) {
+        const g = wallEW.clone();
+        g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+      if (x === dungeonWidth - 1 || !grid[y][x + 1]) {
+        const g = wallEW.clone();
+        g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+    }
+  }
+  wallNS.dispose();
+  wallEW.dispose();
+
+  return { group };
+}

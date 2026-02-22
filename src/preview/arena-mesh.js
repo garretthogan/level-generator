@@ -175,3 +175,92 @@ function buildArenaLights(grid, cols, rows, offsetX, offsetZ) {
   }
   return lights;
 }
+
+/**
+ * Build arena geometry as separate meshes (one per floor tile, one per wall segment)
+ * for GLB export so each piece can be edited individually in another editor.
+ * Returns only the group with mesh children; no lights.
+ */
+export function buildArenaMeshesForExport(arenaResult) {
+  if (!arenaResult?.grids?.length) {
+    const group = new THREE.Group();
+    group.name = 'arena';
+    const geo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
+    group.add(new THREE.Mesh(geo, FLOOR_MATERIAL));
+    return { group };
+  }
+
+  const grid = arenaResult.grids[0];
+  const cols = grid.length;
+  const rows = grid[0]?.length ?? 0;
+  if (cols === 0 || rows === 0) {
+    const group = new THREE.Group();
+    group.name = 'arena';
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1), FLOOR_MATERIAL));
+    return { group };
+  }
+
+  const offsetX = -cols / 2;
+  const offsetZ = -rows / 2;
+  const group = new THREE.Group();
+  group.name = 'arena';
+
+  const tileGeo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
+  for (let x = 0; x < cols; x++) {
+    for (let z = 0; z < rows; z++) {
+      if (grid[x][z] !== 0) continue;
+      const geo = tileGeo.clone();
+      geo.translate(x + 0.5 + offsetX, -FLOOR_THICKNESS / 2, z + 0.5 + offsetZ);
+      const mesh = new THREE.Mesh(geo, FLOOR_MATERIAL);
+      mesh.name = `Floor_${x}_${z}`;
+      group.add(mesh);
+    }
+  }
+  tileGeo.dispose();
+
+  const wallNS = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
+  const wallEW = new THREE.BoxGeometry(WALL_THICKNESS, WALL_HEIGHT, 1);
+  let wallIndex = 0;
+  for (let x = 0; x < cols; x++) {
+    for (let z = 0; z < rows; z++) {
+      if (grid[x][z] !== 0) continue;
+
+      const cx = x + 0.5 + offsetX;
+      const cz = z + 0.5 + offsetZ;
+      const wy = WALL_HEIGHT / 2;
+
+      if (z === 0 || grid[x][z - 1] === 1) {
+        const g = wallNS.clone();
+        g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+      if (z === rows - 1 || grid[x][z + 1] === 1) {
+        const g = wallNS.clone();
+        g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+      if (x === 0 || grid[x - 1][z] === 1) {
+        const g = wallEW.clone();
+        g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+      if (x === cols - 1 || grid[x + 1][z] === 1) {
+        const g = wallEW.clone();
+        g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
+        const m = new THREE.Mesh(g, WALL_MATERIAL);
+        m.name = `Wall_${wallIndex++}`;
+        group.add(m);
+      }
+    }
+  }
+  wallNS.dispose();
+  wallEW.dispose();
+
+  return { group };
+}
