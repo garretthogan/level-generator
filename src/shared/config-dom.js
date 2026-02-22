@@ -19,7 +19,6 @@ export const DUNGEON_PARAM_SPEC = Object.freeze([
   { inputId: 'param-room-padding', displayId: 'val-room-padding', key: 'roomPadding', default: DEFAULT_CONFIG.roomPadding, parse: 'int' },
   { inputId: 'param-min-room', displayId: 'val-min-room', key: 'minRoomSize', default: DEFAULT_CONFIG.minRoomSize, parse: 'int' },
   { inputId: 'param-corridor', displayId: 'val-corridor', key: 'corridorWidth', default: DEFAULT_CONFIG.corridorWidth, parse: 'int' },
-  { inputId: 'param-exit-width', displayId: 'val-exit-width', key: 'exitWidth', default: DEFAULT_CONFIG.exitWidth, parse: 'int' },
 ]);
 
 /** Seed is read separately; its input id for dungeon. */

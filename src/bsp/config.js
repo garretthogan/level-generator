@@ -6,6 +6,5 @@ export const DEFAULT_CONFIG = Object.freeze({
   roomPadding: 2,
   minRoomSize: 8,
   corridorWidth: 2,
-  exitWidth: 2,
   seed: 42,
 });

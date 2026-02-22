@@ -18,15 +18,9 @@ const FLOOR_THICKNESS = 0.2;
 const WALL_HEIGHT = 3;
 const WALL_THICKNESS = 0.15;
 
-function getExitsFromSteps(steps) {
-  const step = steps.find((s) => s.exits && s.exits.length > 0);
-  return step ? step.exits : [];
-}
-
 export function buildDungeonMeshes(steps, config) {
   const { dungeonWidth, dungeonHeight } = config;
-  const exits = getExitsFromSteps(steps);
-  const grid = buildFloorGrid(steps, dungeonWidth, dungeonHeight, exits);
+  const grid = buildFloorGrid(steps, dungeonWidth, dungeonHeight);
   const rooms = extractRooms(steps);
   const spawnRoom = rooms[0];
 
@@ -44,7 +38,7 @@ export function buildDungeonMeshes(steps, config) {
     group.add(new THREE.Mesh(fallbackGeo, FLOOR_MATERIAL));
   }
 
-  const wallMesh = buildWallMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ, exits);
+  const wallMesh = buildWallMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ);
   if (wallMesh) group.add(wallMesh);
 
   const lights = buildRoomLights(rooms, offsetX, offsetZ);
@@ -61,7 +55,7 @@ export function buildDungeonMeshes(steps, config) {
   return { group, grid, spawnPoint, offsetX, offsetZ };
 }
 
-function buildFloorGrid(steps, width, height, exits = []) {
+function buildFloorGrid(steps, width, height) {
   const grid = Array.from({ length: height }, () => new Uint8Array(width));
 
   for (const step of steps) {
@@ -69,13 +63,6 @@ function buildFloorGrid(steps, width, height, exits = []) {
     if (step.segments) {
       for (const seg of step.segments) fillRect(grid, seg, width, height);
     }
-  }
-
-  for (const ex of exits) {
-    if (ex.side === 'n') fillRect(grid, { x: ex.x, y: 0, width: ex.span, height: 1 }, width, height);
-    else if (ex.side === 's') fillRect(grid, { x: ex.x, y: height - 1, width: ex.span, height: 1 }, width, height);
-    else if (ex.side === 'w') fillRect(grid, { x: 0, y: ex.z, width: 1, height: ex.span }, width, height);
-    else if (ex.side === 'e') fillRect(grid, { x: width - 1, y: ex.z, width: 1, height: ex.span }, width, height);
   }
 
   return grid;
@@ -118,21 +105,11 @@ function buildFloorMesh(grid, w, h, offsetX, offsetZ) {
   return new THREE.Mesh(merged, FLOOR_MATERIAL);
 }
 
-function buildWallMesh(grid, w, h, offsetX, offsetZ, exits = []) {
+function buildWallMesh(grid, w, h, offsetX, offsetZ) {
   const walls = [];
 
   const wallNS = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
   const wallEW = new THREE.BoxGeometry(WALL_THICKNESS, WALL_HEIGHT, 1);
-
-  const inExitN = (x) => exits.some((ex) => ex.side === 'n' && x >= ex.x && x < ex.x + ex.span);
-  const inExitS = (x) => exits.some((ex) => ex.side === 's' && x >= ex.x && x < ex.x + ex.span);
-  const inExitW = (z) => exits.some((ex) => ex.side === 'w' && z >= ex.z && z < ex.z + ex.span);
-  const inExitE = (z) => exits.some((ex) => ex.side === 'e' && z >= ex.z && z < ex.z + ex.span);
-
-  const skipNorthWall = (x, y) => (y === 0 && inExitN(x)) || (y > 0 && inExitN(x) && !grid[y - 1][x]);
-  const skipSouthWall = (x, y) => (y === h - 1 && inExitS(x)) || (y < h - 1 && inExitS(x) && !grid[y + 1][x]);
-  const skipWestWall = (x, y) => (x === 0 && inExitW(y)) || (x > 0 && inExitW(y) && !grid[y][x - 1]);
-  const skipEastWall = (x, y) => (x === w - 1 && inExitE(y)) || (x < w - 1 && inExitE(y) && !grid[y][x + 1]);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -143,32 +120,24 @@ function buildWallMesh(grid, w, h, offsetX, offsetZ, exits = []) {
       const wy = WALL_HEIGHT / 2;
 
       if (y === 0 || !grid[y - 1][x]) {
-        if (!skipNorthWall(x, y)) {
-          const g = wallNS.clone();
-          g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
-          walls.push(g);
-        }
+        const g = wallNS.clone();
+        g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
+        walls.push(g);
       }
       if (y === h - 1 || !grid[y + 1][x]) {
-        if (!skipSouthWall(x, y)) {
-          const g = wallNS.clone();
-          g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
-          walls.push(g);
-        }
+        const g = wallNS.clone();
+        g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
+        walls.push(g);
       }
       if (x === 0 || !grid[y][x - 1]) {
-        if (!skipWestWall(x, y)) {
-          const g = wallEW.clone();
-          g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
-          walls.push(g);
-        }
+        const g = wallEW.clone();
+        g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
+        walls.push(g);
       }
       if (x === w - 1 || !grid[y][x + 1]) {
-        if (!skipEastWall(x, y)) {
-          const g = wallEW.clone();
-          g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
-          walls.push(g);
-        }
+        const g = wallEW.clone();
+        g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
+        walls.push(g);
       }
     }
   }
