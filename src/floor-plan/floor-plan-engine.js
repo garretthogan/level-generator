@@ -798,7 +798,7 @@ function growRoomCells(roomRecords, roomIdByCell, hallwayCells, bounds, rng, roo
   let targetFillRatio = clampNumber(
     0.58 + Math.max(0, roomSizeScale - 1) * 0.1 + (shapeStyle - 0.5) * 0.16,
     0.05,
-    0.25
+    0.35
   );
   if (roomCount > 0) {
     const manyRoomsScale = clampNumber(1.35 - roomCount * 0.025, 0.65, 1);
@@ -1294,7 +1294,7 @@ function createWallSegmentsFromOpenings(wall, openings) {
   const dy = wall.edge.y2 - wall.edge.y1;
   const invLength = length === 0 ? 0 : 1 / length;
   return segments
-    .filter((segment) => segment.end - segment.start > 0.08)
+    .filter((segment) => segment.end - segment.start > 0.01)
     .map((segment) => ({
       x1: wall.edge.x1 + dx * segment.start * invLength,
       y1: wall.edge.y1 + dy * segment.start * invLength,

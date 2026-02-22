@@ -4,9 +4,22 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 const MOVE_SPEED = 8;
 const COLLISION_MARGIN = 0.3;
 
-export function createPlayer(camera, domElement, floorGrid, offsetX, offsetZ) {
+function segmentsIntersect(a1x, a1z, a2x, a2z, b1x, b1z, b2x, b2z) {
+  const dxa = a2x - a1x;
+  const dza = a2z - a1z;
+  const dxb = b2x - b1x;
+  const dzb = b2z - b1z;
+  const denom = dxa * dzb - dza * dxb;
+  if (Math.abs(denom) < 1e-10) return false;
+  const t = ((b1x - a1x) * dzb - (b1z - a1z) * dxb) / denom;
+  const s = ((b1x - a1x) * dza - (b1z - a1z) * dxa) / denom;
+  return t > 1e-6 && t < 1 - 1e-6 && s > 1e-6 && s < 1 - 1e-6;
+}
+
+export function createPlayer(camera, domElement, floorGrid, offsetX, offsetZ, wallSegments = null) {
   const controls = new PointerLockControls(camera, domElement);
   const keys = new Set();
+  const walls = Array.isArray(wallSegments) ? wallSegments : [];
 
   domElement.addEventListener('click', () => {
     if (!controls.isLocked) controls.lock();
@@ -32,6 +45,13 @@ export function createPlayer(camera, domElement, floorGrid, offsetX, offsetZ) {
     );
   }
 
+  function moveCrossesWall(prevX, prevZ, nextX, nextZ) {
+    for (const w of walls) {
+      if (segmentsIntersect(prevX, prevZ, nextX, nextZ, w.x1, w.z1, w.x2, w.z2)) return true;
+    }
+    return false;
+  }
+
   function update(dt) {
     if (!controls.isLocked) return;
 
@@ -55,14 +75,17 @@ export function createPlayer(camera, domElement, floorGrid, offsetX, offsetZ) {
     const nextX = camera.position.x;
     const nextZ = camera.position.z;
 
-    if (!canMoveTo(nextX, nextZ)) {
+    const hitWall = walls.length > 0 && moveCrossesWall(prevX, prevZ, nextX, nextZ);
+    if (!canMoveTo(nextX, nextZ) || hitWall) {
       camera.position.x = prevX;
       camera.position.z = prevZ;
 
-      if (canMoveTo(nextX, prevZ)) {
-        camera.position.x = nextX;
-      } else if (canMoveTo(prevX, nextZ)) {
-        camera.position.z = nextZ;
+      if (!hitWall) {
+        if (canMoveTo(nextX, prevZ)) {
+          camera.position.x = nextX;
+        } else if (canMoveTo(prevX, nextZ)) {
+          camera.position.z = nextZ;
+        }
       }
     }
 

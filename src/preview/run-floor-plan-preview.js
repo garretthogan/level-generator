@@ -10,7 +10,7 @@ import { createPlayer } from './player.js';
  * @returns {{ destroy: () => void }}
  */
 export function runFloorPlanPreviewScene(container, overlay, plan) {
-  const { group, grid, spawnPoint, offsetX, offsetZ } = buildFloorPlanMeshes(plan);
+  const { group, grid, spawnPoint, offsetX, offsetZ, wallSegments } = buildFloorPlanMeshes(plan);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);
@@ -39,7 +39,7 @@ export function runFloorPlanPreviewScene(container, overlay, plan) {
   container.appendChild(renderer.domElement);
 
   const clickTarget = container.parentElement || container;
-  const player = createPlayer(camera, clickTarget, grid, offsetX, offsetZ);
+  const player = createPlayer(camera, clickTarget, grid, offsetX, offsetZ, wallSegments);
   if (overlay) {
     player.controls.addEventListener('lock', () => overlay.classList.add('hidden'));
     player.controls.addEventListener('unlock', () => overlay.classList.remove('hidden'));

@@ -202,6 +202,82 @@ function buildWallMeshesFromPlan(plan, offsetX, offsetZ) {
   return new THREE.Mesh(merged, WALL_MATERIAL);
 }
 
+/** Extra padding so wall collision blocks before the player touches the visual wall (reduces clipping). */
+const WALL_COLLISION_PADDING = 0.25;
+
+/**
+ * Build 2D wall segments in world coords (x, z) for collision.
+ * Solid walls are thickened by WALL_COLLISION_PADDING so the player can't clip through.
+ * Only window openings add blocking edges (sill/header); doors are left open so the player can walk through.
+ * @returns {{ x1: number, z1: number, x2: number, z2: number }[]}
+ */
+function buildWallSegmentsForCollision(plan, offsetX, offsetZ) {
+  const segments = [];
+
+  function pushThickSegment(x1, z1, x2, z2) {
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-6) return;
+    const nx = (-dz / len) * WALL_COLLISION_PADDING;
+    const nz = (dx / len) * WALL_COLLISION_PADDING;
+    const ax = x1 + nx;
+    const az = z1 + nz;
+    const bx = x2 + nx;
+    const bz = z2 + nz;
+    const cx = x2 - nx;
+    const cz = z2 - nz;
+    const dx0 = x1 - nx;
+    const dz0 = z1 - nz;
+    segments.push({ x1: ax, z1: az, x2: bx, z2: bz });
+    segments.push({ x1: bx, z1: bz, x2: cx, z2: cz });
+    segments.push({ x1: cx, z1: cz, x2: dx0, z2: dz0 });
+    segments.push({ x1: dx0, z1: dz0, x2: ax, z2: az });
+  }
+
+  for (const wall of plan.walls ?? []) {
+    const x1 = wall.x1 + offsetX;
+    const z1 = wall.y1 + offsetZ;
+    const x2 = wall.x2 + offsetX;
+    const z2 = wall.y2 + offsetZ;
+    pushThickSegment(x1, z1, x2, z2);
+  }
+
+  function pushRectEdges(cx, cz, halfLenX, halfLenZ) {
+    const x0 = cx - halfLenX;
+    const x1 = cx + halfLenX;
+    const z0 = cz - halfLenZ;
+    const z1 = cz + halfLenZ;
+    segments.push({ x1: x0, z1: z0, x2: x1, z2: z0 });
+    segments.push({ x1: x1, z1: z0, x2: x1, z2: z1 });
+    segments.push({ x1: x1, z1: z1, x2: x0, z2: z1 });
+    segments.push({ x1: x0, z1: z1, x2: x0, z2: z0 });
+  }
+
+  for (const opening of plan.openings ?? []) {
+    if (opening.type === 'door') continue;
+    const x1 = Number(opening.x1);
+    const y1 = Number(opening.y1);
+    const x2 = Number(opening.x2);
+    const y2 = Number(opening.y2);
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.01) continue;
+    const midX = (x1 + x2) / 2 + offsetX;
+    const midZ = (y1 + y2) / 2 + offsetZ;
+    const halfLen = len / 2;
+    const halfThick = WALL_THICKNESS / 2;
+    if (Math.abs(dy) < 1e-6) {
+      pushRectEdges(midX, midZ, halfLen, halfThick);
+    } else {
+      pushRectEdges(midX, midZ, halfThick, halfLen);
+    }
+  }
+
+  return segments;
+}
+
 function buildFloorPlanLights(plan, offsetX, offsetZ) {
   const spawns = plan.lightSpawns ?? [];
   return spawns.map((item) => {
@@ -252,7 +328,8 @@ export function buildFloorPlanMeshes(plan) {
       )
     : new THREE.Vector3(offsetX + width / 2, 1.6, offsetZ + height / 2);
 
-  return { group, grid, spawnPoint, offsetX, offsetZ };
+  const wallSegments = buildWallSegmentsForCollision(plan, offsetX, offsetZ);
+  return { group, grid, spawnPoint, offsetX, offsetZ, wallSegments };
 }
 
 /**
