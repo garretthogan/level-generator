@@ -14,6 +14,10 @@ function readOptionsFromDOM() {
     const v = el.type === 'range' ? parseInt(el.value, 10) : parseInt(el.value, 10);
     return Number.isFinite(v) ? v : def;
   };
+  const getCheckbox = (id, def) => {
+    const el = document.getElementById(id);
+    return el ? el.checked : def;
+  };
   return {
     width: get('floor-plan-param-width', DEFAULT_OPTIONS.width),
     height: get('floor-plan-param-height', DEFAULT_OPTIONS.height),
@@ -22,6 +26,7 @@ function readOptionsFromDOM() {
     minCorridorWidthCells: get('floor-plan-param-min-corridor', DEFAULT_OPTIONS.minCorridorWidthCells),
     maxCorridorWidthCells: get('floor-plan-param-max-corridor', DEFAULT_OPTIONS.maxCorridorWidthCells),
     maxLightCount: get('floor-plan-param-max-lights', DEFAULT_OPTIONS.maxLightCount),
+    useTargetFillRatio: getCheckbox('floor-plan-param-use-target-fill-ratio', DEFAULT_OPTIONS.useTargetFillRatio),
     seed: get('floor-plan-param-seed', DEFAULT_OPTIONS.seed),
   };
 }

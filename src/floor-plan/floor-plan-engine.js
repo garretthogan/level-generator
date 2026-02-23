@@ -16,6 +16,7 @@ const DEFAULT_OPTIONS = {
   wallStroke: 0.28,
   minCorridorWidthCells: 3,
   maxCorridorWidthCells: 9,
+  useTargetFillRatio: true,
   seed: Date.now(),
 };
 
@@ -75,26 +76,32 @@ function deriveLayoutScale(options, bounds) {
 }
 
 function deriveCorridorWidthCells(options, bounds, rng) {
+  const area = Math.max(1, bounds.cols * bounds.rows);
+  const smallMap = area < 50 * 50;
+  const absoluteMin = smallMap ? 1 : 3;
   const minWidth = toOddInteger(
     clampNumber(
       Number(options.minCorridorWidthCells) || DEFAULT_OPTIONS.minCorridorWidthCells,
-      3,
+      absoluteMin,
       25
     )
   );
   const maxWidth = toOddInteger(
     clampNumber(
       Number(options.maxCorridorWidthCells) || DEFAULT_OPTIONS.maxCorridorWidthCells,
-      3,
+      absoluteMin,
       25
     )
   );
-  const low = Math.min(minWidth, maxWidth);
-  const high = Math.max(minWidth, maxWidth);
+  let low = Math.min(minWidth, maxWidth);
+  let high = Math.max(minWidth, maxWidth);
+  if (smallMap && low > 1) {
+    low = 1;
+    high = Math.max(high, 1);
+  }
   if (low === high) return low;
 
   // Bias corridor width a bit larger on bigger maps while keeping randomness.
-  const area = Math.max(1, bounds.cols * bounds.rows);
   const mapSizeBias = clampNumber((Math.sqrt(area) - 16) / 24, 0, 1);
   const blend = rng() * 0.65 + mapSizeBias * 0.35;
   const sampled = Math.round(low + (high - low) * blend);
@@ -790,22 +797,28 @@ function isCellClaimableByRoom(x, y, roomId, roomIdByCell, hallwayCells, bounds)
   return true;
 }
 
-function growRoomCells(roomRecords, roomIdByCell, hallwayCells, bounds, rng, roomSizeScale, roomShapeStyle) {
+function growRoomCells(roomRecords, roomIdByCell, hallwayCells, bounds, rng, roomSizeScale, roomShapeStyle, useTargetFillRatio = true) {
   const shapeStyle = normalizeShapeStyle(roomShapeStyle);
   const planArea = bounds.cols * bounds.rows;
   const nonHallwayArea = Math.max(1, planArea - hallwayCells.size);
   const roomCount = roomRecords.length;
-  let targetFillRatio = clampNumber(
-    0.58 + Math.max(0, roomSizeScale - 1) * 0.1 + (shapeStyle - 0.5) * 0.16,
-    0.05,
-    0.35
-  );
-  if (roomCount > 0) {
-    const manyRoomsScale = clampNumber(1.35 - roomCount * 0.025, 0.65, 1);
-    targetFillRatio *= manyRoomsScale;
-  }
-  const targetRoomCellCount = Math.floor(nonHallwayArea * targetFillRatio);
+  let targetRoomCellCount;
   let claimedRoomCells = roomIdByCell.size;
+  if (useTargetFillRatio) {
+    let targetFillRatio = clampNumber(
+      0.58 + Math.max(0, roomSizeScale - 1) * 0.1 + (shapeStyle - 0.5) * 0.16,
+      0.05,
+      0.35
+    );
+    if (roomCount > 0) {
+      const manyRoomsScale = clampNumber(1.35 - roomCount * 0.025, 0.65, 1);
+      targetFillRatio *= manyRoomsScale;
+    }
+    targetRoomCellCount = Math.floor(nonHallwayArea * targetFillRatio);
+  } else {
+    // No expansion: keep rooms at initial placement size.
+    targetRoomCellCount = claimedRoomCells;
+  }
   if (claimedRoomCells >= targetRoomCellCount) {
     return;
   }
@@ -920,7 +933,8 @@ function generateRoomsFromDoors(
   bounds,
   rng,
   roomSizeScale = 1,
-  roomShapeStyle = DEFAULT_OPTIONS.roomShapeStyle
+  roomShapeStyle = DEFAULT_OPTIONS.roomShapeStyle,
+  useTargetFillRatio = true
 ) {
   const wallByKey = new Map(hallwayWalls.map((wall) => [edgeKey(wall.edge), wall]));
   const occupiedCells = new Set(hallwayCells);
@@ -1013,7 +1027,7 @@ function generateRoomsFromDoors(
     }
   }
 
-  growRoomCells(roomRecords, roomIdByCell, hallwayCells, bounds, rng, roomSizeScale, roomShapeStyle);
+  growRoomCells(roomRecords, roomIdByCell, hallwayCells, bounds, rng, roomSizeScale, roomShapeStyle, useTargetFillRatio);
   const rooms = roomRecords.map((room) => buildRoomDataFromCells(room.id, room.cells));
   const roomWalls = buildRoomPerimeterWallsFromCells(roomRecords, hallwayCells);
 
@@ -1054,7 +1068,8 @@ function generateRoomsWithAdaptiveScale({
       bounds,
       variantRng,
       roomSizeScale,
-      roomShapeStyle
+      roomShapeStyle,
+      options.useTargetFillRatio !== false
     );
     const exteriorRoomExits = chooseExteriorExitOpenings(roomWalls, rooms, options, variantRng);
 
@@ -1162,8 +1177,29 @@ function chooseExteriorExitOpenings(roomWalls, rooms, options, rng) {
     candidatesByRoom.get(key).push(candidate);
   }
   const roomIds = [...candidatesByRoom.keys()];
-  if (roomIds.length < 2) {
+  if (roomIds.length === 0) {
     return [];
+  }
+
+  // Single room: place one exterior exit (valid for 1-room / small plans).
+  if (roomIds.length === 1) {
+    const roomId = roomIds[0];
+    const roomCandidates = candidatesByRoom.get(roomId) ?? [];
+    if (roomCandidates.length === 0) return [];
+    const chosen = roomCandidates[randomInt(rng, 0, roomCandidates.length - 1)];
+    const remaining = Math.max(0.2, chosen.length - options.doorWidth);
+    const minOffset = 0.1;
+    const maxOffset = Math.max(minOffset, remaining - 0.1);
+    const offset = minOffset + rng() * (maxOffset - minOffset);
+    return [
+      {
+        wallKey: chosen.wallKey,
+        type: 'door',
+        start: offset,
+        end: offset + options.doorWidth,
+        roomId,
+      },
+    ];
   }
 
   const roomCenterById = new Map(
@@ -1408,7 +1444,7 @@ function generatePlanAttempt(options, bounds, seed) {
     walls,
     openings: openingGlyphs,
     connectedDoors,
-    hasExteriorExit: exteriorRoomExits.length >= 2,
+    hasExteriorExit: exteriorRoomExits.length >= 1,
     corridorWidthCells,
   };
 }
@@ -1427,6 +1463,7 @@ export function generateFloorPlan(userOptions = {}) {
       100
     )
   );
+  options.useTargetFillRatio = options.useTargetFillRatio !== false;
   options.doorWidth = clampNumber(Number(options.doorWidth) || DEFAULT_OPTIONS.doorWidth, 0.8, 2.5);
   options.maxWindowCount = Math.round(clampNumber(Number(options.maxWindowCount) || 0, 0, 40));
   options.windowWidth = clampNumber(Number(options.windowWidth) || DEFAULT_OPTIONS.windowWidth, 0.8, 2.8);
@@ -1487,7 +1524,7 @@ export function generateFloorPlan(userOptions = {}) {
   }
   if (requireExteriorExits && !bestAttempt.hasExteriorExit) {
     throw new Error(
-      'Could not place at least 2 exterior exits on different rooms. Try regenerating or increasing map size.'
+      'Could not place exterior exit(s). For single-room plans at least one exterior exit is required; for multi-room, at least two on different rooms. Try regenerating or increasing map size.'
     );
   }
 
