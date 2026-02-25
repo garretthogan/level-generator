@@ -1,23 +1,25 @@
 /**
  * Load and provide random textures from /textures/Dark for 3D preview walls and floors.
+ * Uses import.meta.env.BASE_URL so textures load when the app is served from a subpath (e.g. GitHub Pages).
  * Ref: https://threejs.org/docs/#api/en/loaders/TextureLoader
  */
 
 import * as THREE from 'three';
 
-const BASE = '/textures/Dark';
+// Vite BASE_URL is '/' in dev or '/repo-name/' on GitHub Pages.
+const getBase = () => `${(import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/textures/Dark`;
 
 const DARK_TEXTURE_PATHS = [
-  `${BASE}/texture_01.png`,
-  `${BASE}/texture_13.png`,
-  `${BASE}/Fixtures/texture_02.png`,
-  `${BASE}/Fixtures/texture_03.png`,
-  `${BASE}/Fixtures/texture_04.png`,
-  `${BASE}/Fixtures/texture_05.png`,
-  `${BASE}/Fixtures/texture_06.png`,
-  `${BASE}/Fixtures/texture_07.png`,
-  `${BASE}/Fixtures/texture_08.png`,
-  `${BASE}/Fixtures/texture_09.png`,
+  () => `${getBase()}/texture_01.png`,
+  () => `${getBase()}/texture_13.png`,
+  () => `${getBase()}/Fixtures/texture_02.png`,
+  () => `${getBase()}/Fixtures/texture_03.png`,
+  () => `${getBase()}/Fixtures/texture_04.png`,
+  () => `${getBase()}/Fixtures/texture_05.png`,
+  () => `${getBase()}/Fixtures/texture_06.png`,
+  () => `${getBase()}/Fixtures/texture_07.png`,
+  () => `${getBase()}/Fixtures/texture_08.png`,
+  () => `${getBase()}/Fixtures/texture_09.png`,
 ];
 
 let cachedTexturesPromise = null;
@@ -30,8 +32,9 @@ export function loadDarkTextures() {
   if (cachedTexturesPromise) return cachedTexturesPromise;
   const loader = new THREE.TextureLoader();
   cachedTexturesPromise = Promise.all(
-    DARK_TEXTURE_PATHS.map((path) =>
+    DARK_TEXTURE_PATHS.map((getPath) =>
       new Promise((resolve, reject) => {
+        const path = typeof getPath === 'function' ? getPath() : getPath;
         loader.load(
           path,
           (tex) => {
