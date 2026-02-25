@@ -1,4 +1,4 @@
-import { generateDungeon, StepPhase } from './bsp/generate.js';
+import { generateDungeon } from './bsp/generate.js';
 import { DEFAULT_CONFIG } from './bsp/config.js';
 import { createRenderer } from './renderer.js';
 import * as previewCoordinator from './preview/coordinator.js';
@@ -8,18 +8,8 @@ import { showGeneratorSpinner, hideGeneratorSpinner, runAfterSpinnerVisible } fr
 
 const State = Object.freeze({
   IDLE: 'idle',
-  STEPPING: 'stepping',
-  PLAYING: 'playing',
   COMPLETE: 'complete',
 });
-
-const SPEED_MS = { 1: 500, 2: 200, 3: 80, 4: 20 };
-
-const PHASE_LABELS = {
-  [StepPhase.PARTITION]: 'Partitioning',
-  [StepPhase.ROOMS]: 'Placing Rooms',
-  [StepPhase.CORRIDORS]: 'Connecting',
-};
 
 export function initApp() {
   const canvas = document.getElementById('dungeon-canvas');
@@ -28,7 +18,6 @@ export function initApp() {
   let state = State.IDLE;
   let steps = [];
   let stepIndex = -1;
-  let playTimer = null;
   let config = { ...DEFAULT_CONFIG };
 
   const camera = { panX: 0, panY: 0, zoom: 1 };
@@ -53,19 +42,10 @@ export function initApp() {
   }
 
   function generateInstant() {
-    stopPlay();
     randomizeSeed();
     steps = generateDungeon(config);
     stepIndex = steps.length - 1;
     transition(State.COMPLETE);
-  }
-
-  function startDebug() {
-    stopPlay();
-    advanceSeed();
-    steps = generateDungeon(config);
-    stepIndex = 0;
-    transition(State.STEPPING);
   }
 
   function openPreview() {
@@ -94,44 +74,6 @@ export function initApp() {
     }
   }
 
-  function advanceStep() {
-    if (stepIndex >= steps.length - 1) {
-      stopPlay();
-      transition(State.COMPLETE);
-      return;
-    }
-    stepIndex++;
-    draw();
-    syncUI();
-    if (stepIndex >= steps.length - 1) {
-      stopPlay();
-      transition(State.COMPLETE);
-    }
-  }
-
-  function startPlay() {
-    transition(State.PLAYING);
-    restartPlayTimer();
-  }
-
-  function pausePlay() {
-    stopPlay();
-    transition(State.STEPPING);
-  }
-
-  function restartPlayTimer() {
-    stopPlay();
-    const speed = SPEED_MS[parseInt(ui.speedInput.value, 10)] || 200;
-    playTimer = setInterval(advanceStep, speed);
-  }
-
-  function stopPlay() {
-    if (playTimer !== null) {
-      clearInterval(playTimer);
-      playTimer = null;
-    }
-  }
-
   function transition(newState) {
     state = newState;
     draw();
@@ -149,35 +91,11 @@ export function initApp() {
 
   function syncUI() {
     const idle = state === State.IDLE;
-    const stepping = state === State.STEPPING;
-    const playing = state === State.PLAYING;
     const complete = state === State.COMPLETE;
-    const debugging = stepping || playing;
 
-    if (ui.debugPanel) {
-      ui.debugPanel.classList.toggle('collapsed', !debugging);
-      const debugExpanded = debugging;
-      const debugHeader = ui.debugPanel.querySelector('.panel-header');
-      if (debugHeader) debugHeader.setAttribute('aria-expanded', String(debugExpanded));
-    }
-    ui.btnStep.disabled = !stepping || stepIndex >= steps.length - 1;
-    ui.btnPlay.classList.toggle('hidden', playing);
-    ui.btnPause.classList.toggle('hidden', !playing);
-    ui.btnPlay.disabled = !stepping;
     ui.btnPreview.disabled = steps.length === 0;
     ui.btnExportGlb.disabled = steps.length === 0;
-
-    toggleParamInputs(debugging);
-
     updateStatusText(idle, complete);
-    updateStepInfoText();
-  }
-
-  function toggleParamInputs(disabled) {
-    for (const { input } of Object.values(ui.params)) {
-      input.disabled = disabled;
-    }
-    ui.seedInput.disabled = disabled;
   }
 
   function updateStatusText(idle, complete) {
@@ -187,19 +105,6 @@ export function initApp() {
     }
     if (complete) {
       ui.status.textContent = `Complete \u2014 ${steps.length} steps`;
-      return;
-    }
-    if (stepIndex >= 0 && stepIndex < steps.length) {
-      const phase = PHASE_LABELS[steps[stepIndex].phase] || '';
-      ui.status.textContent = `${phase} \u2014 Step ${stepIndex + 1} / ${steps.length}`;
-    }
-  }
-
-  function updateStepInfoText() {
-    if (stepIndex >= 0 && stepIndex < steps.length) {
-      ui.stepInfo.textContent = `Step ${stepIndex + 1} / ${steps.length} \u2014 ${steps[stepIndex].label}`;
-    } else {
-      ui.stepInfo.textContent = '';
     }
   }
 
@@ -210,20 +115,8 @@ export function initApp() {
       document.activeElement.blur();
     }
 
-    switch (event.key) {
-      case ' ':
-        event.preventDefault();
-        if (state === State.STEPPING) advanceStep();
-        else if (state === State.PLAYING) pausePlay();
-        else startDebug();
-        break;
-      case 'g':
-        generateInstant();
-        break;
-      case 'p':
-        if (state === State.STEPPING) startPlay();
-        else if (state === State.PLAYING) pausePlay();
-        break;
+    if (event.key === 'g') {
+      generateInstant();
     }
   }
 
@@ -232,11 +125,6 @@ export function initApp() {
 
     ui.seedInput.addEventListener('input', () => {
       config.seed = parseInt(ui.seedInput.value, 10) || 0;
-    });
-
-    ui.speedInput.addEventListener('input', () => {
-      ui.speedDisplay.textContent = `${ui.speedInput.value}x`;
-      if (state === State.PLAYING) restartPlayTimer();
     });
 
     ui.btnGenerate.addEventListener('click', () => {
@@ -249,7 +137,6 @@ export function initApp() {
         }
       });
     });
-    ui.btnDebug.addEventListener('click', startDebug);
     ui.btnPreview.addEventListener('click', openPreview);
     ui.btnExportGlb.addEventListener('click', exportGlb);
     const backBtn = document.getElementById('preview-back-btn');
@@ -259,10 +146,6 @@ export function initApp() {
         previewCoordinator.closePreview();
       });
     }
-    ui.btnStep.addEventListener('click', advanceStep);
-    ui.btnPlay.addEventListener('click', startPlay);
-    ui.btnPause.addEventListener('click', pausePlay);
-
     ui.controlsHeader.addEventListener('click', () => {
       ui.controlsArea.classList.toggle('collapsed');
       const expanded = !ui.controlsArea.classList.contains('collapsed');
@@ -303,19 +186,10 @@ function bindUI() {
   return {
     params,
     seedInput: document.getElementById(DUNGEON_SEED_INPUT_ID),
-    speedInput: document.getElementById('param-speed'),
-    speedDisplay: document.getElementById('val-speed'),
     status: document.getElementById('status'),
-    stepInfo: document.getElementById('step-info'),
-    debugControls: document.getElementById('debug-controls'),
-    debugPanel: document.getElementById('debug-panel'),
     btnGenerate: document.getElementById('btn-generate'),
-    btnDebug: document.getElementById('btn-debug'),
     btnPreview: document.getElementById('btn-preview'),
     btnExportGlb: document.getElementById('btn-export-glb'),
-    btnStep: document.getElementById('btn-step'),
-    btnPlay: document.getElementById('btn-play'),
-    btnPause: document.getElementById('btn-pause'),
     controlsArea: document.getElementById('controls-area'),
     controlsHeader: document.querySelector('.controls-area-header'),
   };

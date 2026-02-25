@@ -105,7 +105,6 @@
           <span id="floor-plan-status" class="hint hidden" aria-live="polite" style="margin-left: auto; margin-right: var(--tui-gap);">Ready</span>
           <div class="dungeon-actions" style="display: flex; gap: var(--tui-gap);">
             <button type="button" id="btn-generate" class="primary" title="Generate dungeon instantly (G)">Generate</button>
-            <button type="button" id="btn-debug" title="Step through generation (Space)">Debug</button>
             <button type="button" id="btn-preview" title="Open 3D preview" disabled>Preview</button>
             <button type="button" id="btn-export-glb" title="Download dungeon as GLB file" disabled>Export GLB</button>
           </div>
@@ -134,25 +133,6 @@
         <div class="controls-area-content">
           <div id="tabpanel-dungeon" role="tabpanel" aria-hidden="false">
             <div class="controls-panels">
-              <div class="panel collapsed" id="debug-panel">
-                <button type="button" class="panel-header" aria-expanded="false" aria-label="Toggle debug panel">
-                  <span class="panel-chevron">&#9660;</span>
-                  Debug
-                </button>
-                <div class="panel-content" id="debug-controls">
-                  <div class="panel-actions">
-                    <button type="button" id="btn-step" title="Advance one step (Space)">Next Step</button>
-                    <button type="button" id="btn-play" title="Auto-advance steps (P)">Play</button>
-                    <button type="button" id="btn-pause" class="hidden" title="Pause auto-advance (P)">Pause</button>
-                  </div>
-                  <div class="control-row">
-                    <label for="param-speed" title="Playback speed when stepping through generation (1x–8x).">Speed</label>
-                    <input type="range" id="param-speed" min="1" max="8" value="2" />
-                    <span id="val-speed">2x</span>
-                  </div>
-                  <p id="step-info" class="hint" style="margin: 0;"></p>
-                </div>
-              </div>
               <div class="panel" id="params-panel">
                 <button type="button" class="panel-header">
                   <span class="panel-chevron">&#9660;</span>
