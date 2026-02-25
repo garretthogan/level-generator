@@ -18,15 +18,18 @@ export async function openPreview(payload, returnToOverride) {
     returnTo = returnToOverride ?? 'dungeon';
     const { runPreviewScene } = await import('./run-preview.js');
     const { config, steps } = payload;
-    previewDestroy = runPreviewScene(container, overlay, config, steps).destroy;
+    const result = await runPreviewScene(container, overlay, config, steps);
+    previewDestroy = result.destroy;
   } else if (payload.type === 'arena') {
     returnTo = returnToOverride ?? 'arena';
     const { runArenaPreviewScene } = await import('./run-arena-preview.js');
-    previewDestroy = runArenaPreviewScene(container, overlay, payload.arenaResult).destroy;
+    const result = await runArenaPreviewScene(container, overlay, payload.arenaResult);
+    previewDestroy = result.destroy;
   } else if (payload.type === 'floor-plan') {
     returnTo = returnToOverride ?? 'floor-plan';
     const { runFloorPlanPreviewScene } = await import('./run-floor-plan-preview.js');
-    previewDestroy = runFloorPlanPreviewScene(container, overlay, payload.plan).destroy;
+    const result = await runFloorPlanPreviewScene(container, overlay, payload.plan);
+    previewDestroy = result.destroy;
   } else {
     return;
   }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { getRandomFloorMaterial, getRandomWallMaterial } from './dark-textures.js';
 
 // Ref: https://threejs.org/docs/#api/en/materials/MeshStandardMaterial
 const FLOOR_MATERIAL = new THREE.MeshStandardMaterial({
@@ -18,7 +19,12 @@ const FLOOR_THICKNESS = 0.2;
 const WALL_HEIGHT = 3;
 const WALL_THICKNESS = 0.15;
 
-export function buildDungeonMeshes(steps, config) {
+/**
+ * @param {object} steps - Dungeon generation steps
+ * @param {object} config - { dungeonWidth, dungeonHeight }
+ * @param {THREE.Texture[]} [darkTextures] - If provided, random Dark folder textures applied per floor tile and wall segment.
+ */
+export function buildDungeonMeshes(steps, config, darkTextures = null) {
   const { dungeonWidth, dungeonHeight } = config;
   const grid = buildFloorGrid(steps, dungeonWidth, dungeonHeight);
   const rooms = extractRooms(steps);
@@ -29,16 +35,16 @@ export function buildDungeonMeshes(steps, config) {
 
   const group = new THREE.Group();
 
-  const floorMesh = buildFloorMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ);
+  const floorMesh = buildFloorMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ, darkTextures);
   if (floorMesh) {
     group.add(floorMesh);
-  } else {
+  } else if (!darkTextures?.length) {
     const fallbackGeo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
     fallbackGeo.translate(offsetX + 0.5, -FLOOR_THICKNESS / 2, offsetZ + 0.5);
     group.add(new THREE.Mesh(fallbackGeo, FLOOR_MATERIAL));
   }
 
-  const wallMesh = buildWallMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ);
+  const wallMesh = buildWallMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ, darkTextures);
   if (wallMesh) group.add(wallMesh);
 
   const lights = buildRoomLights(rooms, offsetX, offsetZ);
@@ -84,7 +90,7 @@ function extractRooms(steps) {
   return steps.filter((s) => s.room).map((s) => s.room);
 }
 
-function buildFloorMesh(grid, w, h, offsetX, offsetZ) {
+function buildFloorMesh(grid, w, h, offsetX, offsetZ, darkTextures = null) {
   const tileGeo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
   const tiles = [];
 
@@ -100,12 +106,21 @@ function buildFloorMesh(grid, w, h, offsetX, offsetZ) {
   tileGeo.dispose();
   if (tiles.length === 0) return null;
 
+  if (darkTextures?.length) {
+    const group = new THREE.Group();
+    for (const geo of tiles) {
+      const mat = getRandomFloorMaterial(darkTextures, { repeatX: 1, repeatY: 1 });
+      group.add(new THREE.Mesh(geo, mat));
+    }
+    return group;
+  }
+
   const merged = mergeGeometries(tiles);
   for (const t of tiles) t.dispose();
   return new THREE.Mesh(merged, FLOOR_MATERIAL);
 }
 
-function buildWallMesh(grid, w, h, offsetX, offsetZ) {
+function buildWallMesh(grid, w, h, offsetX, offsetZ, darkTextures = null) {
   const walls = [];
 
   const wallNS = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
@@ -145,6 +160,15 @@ function buildWallMesh(grid, w, h, offsetX, offsetZ) {
   wallNS.dispose();
   wallEW.dispose();
   if (walls.length === 0) return null;
+
+  if (darkTextures?.length) {
+    const group = new THREE.Group();
+    for (const geo of walls) {
+      const mat = getRandomWallMaterial(darkTextures, { repeatX: 1, repeatY: WALL_HEIGHT });
+      group.add(new THREE.Mesh(geo, mat));
+    }
+    return group;
+  }
 
   const merged = mergeGeometries(walls);
   for (const w of walls) w.dispose();

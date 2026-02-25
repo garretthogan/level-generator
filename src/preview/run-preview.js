@@ -1,17 +1,20 @@
 import * as THREE from 'three';
 import { buildDungeonMeshes } from './dungeon-mesh.js';
+import { loadDarkTextures } from './dark-textures.js';
 import { createPlayer } from './player.js';
 
 /**
  * Runs the 3D preview scene inside the given container. Call destroy() when leaving preview.
+ * Loads Dark folder textures and applies them randomly to each wall and floor.
  * @param {HTMLElement} container - Element to append the canvas to (e.g. #preview-canvas-container)
  * @param {HTMLElement} overlay - Overlay element to hide on pointer lock, show on unlock
  * @param {Object} config - Dungeon config
  * @param {Array} steps - Generated dungeon steps
- * @returns {{ destroy: () => void }}
+ * @returns {Promise<{ destroy: () => void }>}
  */
-export function runPreviewScene(container, overlay, config, steps) {
-  const { group, grid, spawnPoint, offsetX, offsetZ } = buildDungeonMeshes(steps, config);
+export async function runPreviewScene(container, overlay, config, steps) {
+  const darkTextures = await loadDarkTextures();
+  const { group, grid, spawnPoint, offsetX, offsetZ } = buildDungeonMeshes(steps, config, darkTextures);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);

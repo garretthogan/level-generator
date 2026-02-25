@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { getRandomFloorMaterial, getRandomWallMaterial } from './dark-textures.js';
 
 // Same materials as dungeon-mesh for consistent look
 // Ref: https://threejs.org/docs/#api/en/materials/MeshStandardMaterial
@@ -24,8 +25,9 @@ const WALL_THICKNESS = 0.15;
  * Arena grid is column-major: grid[x][z], 0 = open (floor), 1 = wall.
  * Returns group, walkable grid for player (rows x cols, 1 = walkable), spawn point, offsets.
  * @param {object} arenaResult - { grids, spawns, flags, collisionPoints, covers }
+ * @param {THREE.Texture[]} [darkTextures] - If provided, random Dark folder textures applied per floor tile and wall segment.
  */
-export function buildArenaMeshes(arenaResult) {
+export function buildArenaMeshes(arenaResult, darkTextures = null) {
   if (!arenaResult?.grids?.length) {
     const fallback = new THREE.Group();
     const geo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
@@ -72,10 +74,10 @@ export function buildArenaMeshes(arenaResult) {
 
   const group = new THREE.Group();
 
-  const floorMesh = buildArenaFloorMesh(grid, cols, rows, offsetX, offsetZ);
+  const floorMesh = buildArenaFloorMesh(grid, cols, rows, offsetX, offsetZ, darkTextures);
   if (floorMesh) group.add(floorMesh);
 
-  const wallMesh = buildArenaWallMesh(grid, cols, rows, offsetX, offsetZ);
+  const wallMesh = buildArenaWallMesh(grid, cols, rows, offsetX, offsetZ, darkTextures);
   if (wallMesh) group.add(wallMesh);
 
   const lights = buildArenaLights(grid, cols, rows, offsetX, offsetZ);
@@ -89,7 +91,7 @@ export function buildArenaMeshes(arenaResult) {
   return { group, grid: floorGrid, spawnPoint, offsetX, offsetZ };
 }
 
-function buildArenaFloorMesh(grid, cols, rows, offsetX, offsetZ) {
+function buildArenaFloorMesh(grid, cols, rows, offsetX, offsetZ, darkTextures = null) {
   const tileGeo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
   const tiles = [];
 
@@ -105,12 +107,21 @@ function buildArenaFloorMesh(grid, cols, rows, offsetX, offsetZ) {
   tileGeo.dispose();
   if (tiles.length === 0) return null;
 
+  if (darkTextures?.length) {
+    const group = new THREE.Group();
+    for (const geo of tiles) {
+      const mat = getRandomFloorMaterial(darkTextures, { repeatX: 1, repeatY: 1 });
+      group.add(new THREE.Mesh(geo, mat));
+    }
+    return group;
+  }
+
   const merged = mergeGeometries(tiles);
   for (const t of tiles) t.dispose();
   return new THREE.Mesh(merged, FLOOR_MATERIAL);
 }
 
-function buildArenaWallMesh(grid, cols, rows, offsetX, offsetZ) {
+function buildArenaWallMesh(grid, cols, rows, offsetX, offsetZ, darkTextures = null) {
   const walls = [];
   const wallNS = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
   const wallEW = new THREE.BoxGeometry(WALL_THICKNESS, WALL_HEIGHT, 1);
@@ -149,6 +160,15 @@ function buildArenaWallMesh(grid, cols, rows, offsetX, offsetZ) {
   wallNS.dispose();
   wallEW.dispose();
   if (walls.length === 0) return null;
+
+  if (darkTextures?.length) {
+    const group = new THREE.Group();
+    for (const geo of walls) {
+      const mat = getRandomWallMaterial(darkTextures, { repeatX: 1, repeatY: WALL_HEIGHT });
+      group.add(new THREE.Mesh(geo, mat));
+    }
+    return group;
+  }
 
   const merged = mergeGeometries(walls);
   for (const w of walls) w.dispose();

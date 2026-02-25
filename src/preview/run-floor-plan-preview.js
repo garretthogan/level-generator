@@ -1,16 +1,19 @@
 import * as THREE from 'three';
 import { buildFloorPlanMeshes } from './floor-plan-mesh.js';
+import { loadDarkTextures } from './dark-textures.js';
 import { createPlayer } from './player.js';
 
 /**
  * Runs the 3D floor plan preview scene. Call destroy() when leaving preview.
+ * Loads Dark folder textures and applies them randomly to each wall and floor.
  * @param {HTMLElement} container
  * @param {HTMLElement} overlay
  * @param {object} plan - Floor plan from generateFloorPlan()
- * @returns {{ destroy: () => void }}
+ * @returns {Promise<{ destroy: () => void }>}
  */
-export function runFloorPlanPreviewScene(container, overlay, plan) {
-  const { group, grid, spawnPoint, offsetX, offsetZ, wallSegments } = buildFloorPlanMeshes(plan);
+export async function runFloorPlanPreviewScene(container, overlay, plan) {
+  const darkTextures = await loadDarkTextures();
+  const { group, grid, spawnPoint, offsetX, offsetZ, wallSegments } = buildFloorPlanMeshes(plan, darkTextures);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);

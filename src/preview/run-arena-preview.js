@@ -1,16 +1,19 @@
 import * as THREE from 'three';
 import { buildArenaMeshes } from './arena-mesh.js';
+import { loadDarkTextures } from './dark-textures.js';
 import { createPlayer } from './player.js';
 
 /**
  * Runs the 3D arena preview scene. Call destroy() when leaving preview.
+ * Loads Dark folder textures and applies them randomly to each wall and floor.
  * @param {HTMLElement} container
  * @param {HTMLElement} overlay
  * @param {object} arenaResult - { grids, spawns, flags, collisionPoints, covers }
- * @returns {{ destroy: () => void }}
+ * @returns {Promise<{ destroy: () => void }>}
  */
-export function runArenaPreviewScene(container, overlay, arenaResult) {
-  const { group, grid, spawnPoint, offsetX, offsetZ } = buildArenaMeshes(arenaResult);
+export async function runArenaPreviewScene(container, overlay, arenaResult) {
+  const darkTextures = await loadDarkTextures();
+  const { group, grid, spawnPoint, offsetX, offsetZ } = buildArenaMeshes(arenaResult, darkTextures);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);

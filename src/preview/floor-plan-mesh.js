@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { getRandomFloorMaterial, getRandomWallMaterial } from './dark-textures.js';
 
 const FLOOR_MATERIAL = new THREE.MeshStandardMaterial({
   color: 0x4a4a5e,
@@ -60,7 +61,7 @@ function buildFloorGridFromPlan(plan) {
   return { grid, width: w, height: h };
 }
 
-function buildFloorMeshFromGrid(grid, width, height, offsetX, offsetZ) {
+function buildFloorMeshFromGrid(grid, width, height, offsetX, offsetZ, darkTextures = null) {
   const tileGeo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
   const tiles = [];
 
@@ -75,6 +76,15 @@ function buildFloorMeshFromGrid(grid, width, height, offsetX, offsetZ) {
 
   tileGeo.dispose();
   if (tiles.length === 0) return null;
+
+  if (darkTextures?.length) {
+    const group = new THREE.Group();
+    for (const geo of tiles) {
+      const mat = getRandomFloorMaterial(darkTextures, { repeatX: 1, repeatY: 1 });
+      group.add(new THREE.Mesh(geo, mat));
+    }
+    return group;
+  }
 
   const merged = mergeGeometries(tiles);
   for (const t of tiles) t.dispose();
@@ -177,7 +187,15 @@ function buildOpeningMeshesFromPlan(plan, offsetX, offsetZ) {
   return new THREE.Mesh(merged, WALL_MATERIAL);
 }
 
-function buildWallMeshesFromPlan(plan, offsetX, offsetZ) {
+function buildOpeningMeshesFromPlanWithTextures(plan, offsetX, offsetZ, darkTextures) {
+  const mesh = buildOpeningMeshesFromPlan(plan, offsetX, offsetZ);
+  if (!mesh || !darkTextures?.length) return mesh;
+  mesh.material.dispose();
+  mesh.material = getRandomWallMaterial(darkTextures, { repeatX: 2, repeatY: WALL_HEIGHT });
+  return mesh;
+}
+
+function buildWallMeshesFromPlan(plan, offsetX, offsetZ, darkTextures = null) {
   const walls = plan.walls ?? [];
   const openingKeys = new Set();
   for (const opening of plan.openings ?? []) {
@@ -186,6 +204,21 @@ function buildWallMeshesFromPlan(plan, offsetX, offsetZ) {
       opening.x2, opening.y2
     );
     openingKeys.add(edgeKey(edge));
+  }
+
+  if (darkTextures?.length) {
+    const group = new THREE.Group();
+    for (const wall of walls) {
+      const key = edgeKey(normalizeEdge(wall.x1, wall.y1, wall.x2, wall.y2));
+      if (openingKeys.has(key)) continue;
+      const geo = buildWallSegmentMesh(wall, offsetX, offsetZ);
+      if (geo) {
+        const len = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+        const mat = getRandomWallMaterial(darkTextures, { repeatX: len, repeatY: WALL_HEIGHT });
+        group.add(new THREE.Mesh(geo, mat));
+      }
+    }
+    return group.children.length ? group : null;
   }
 
   const geos = [];
@@ -293,26 +326,30 @@ function buildFloorPlanLights(plan, offsetX, offsetZ) {
 
 /**
  * Build floor plan meshes for 3D preview. Returns merged floor + walls, lights, grid, spawn point.
+ * @param {object} plan - Floor plan from generateFloorPlan()
+ * @param {THREE.Texture[]} [darkTextures] - If provided, random Dark folder textures are applied per floor tile and wall segment.
  */
-export function buildFloorPlanMeshes(plan) {
+export function buildFloorPlanMeshes(plan, darkTextures = null) {
   const { grid, width, height } = buildFloorGridFromPlan(plan);
   const offsetX = -width / 2;
   const offsetZ = -height / 2;
 
   const group = new THREE.Group();
 
-  const floorMesh = buildFloorMeshFromGrid(grid, width, height, offsetX, offsetZ);
+  const floorMesh = buildFloorMeshFromGrid(grid, width, height, offsetX, offsetZ, darkTextures);
   if (floorMesh) group.add(floorMesh);
-  else {
+  else if (!darkTextures?.length) {
     const fallbackGeo = new THREE.BoxGeometry(1, FLOOR_THICKNESS, 1);
     fallbackGeo.translate(offsetX + 0.5, -FLOOR_THICKNESS / 2, offsetZ + 0.5);
     group.add(new THREE.Mesh(fallbackGeo, FLOOR_MATERIAL));
   }
 
-  const wallMesh = buildWallMeshesFromPlan(plan, offsetX, offsetZ);
+  const wallMesh = buildWallMeshesFromPlan(plan, offsetX, offsetZ, darkTextures);
   if (wallMesh) group.add(wallMesh);
 
-  const openingMesh = buildOpeningMeshesFromPlan(plan, offsetX, offsetZ);
+  const openingMesh = darkTextures?.length
+    ? buildOpeningMeshesFromPlanWithTextures(plan, offsetX, offsetZ, darkTextures)
+    : buildOpeningMeshesFromPlan(plan, offsetX, offsetZ);
   if (openingMesh) group.add(openingMesh);
 
   const lights = buildFloorPlanLights(plan, offsetX, offsetZ);
