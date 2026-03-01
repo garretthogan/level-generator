@@ -147,6 +147,7 @@ export function initApp() {
       });
     }
     ui.controlsHeader.addEventListener('click', () => {
+      if (new URLSearchParams(window.location.search).get('unreal-engine') === 'true') return;
       ui.controlsArea.classList.toggle('collapsed');
       const expanded = !ui.controlsArea.classList.contains('collapsed');
       ui.controlsHeader.setAttribute('aria-expanded', String(expanded));

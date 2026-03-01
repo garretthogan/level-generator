@@ -6,6 +6,18 @@ import { initFloorPlanApp } from './floor-plan-app.js';
 import { initGalleryApp } from './gallery/gallery-app.js';
 import { showGeneratorSpinner, hideGeneratorSpinner, runAfterSpinnerVisible } from './shared/loading-spinner.js';
 
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('unreal-engine') === 'true') {
+  for (const id of ['btn-preview', 'arena-btn-preview', 'floor-plan-btn-preview']) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  }
+  const controlsArea = document.getElementById('controls-area');
+  if (controlsArea) controlsArea.classList.remove('collapsed');
+  const controlsHeader = document.querySelector('.controls-area-header');
+  if (controlsHeader) controlsHeader.setAttribute('aria-expanded', 'true');
+}
+
 initApp();
 
 const viewport = document.getElementById('viewport');
