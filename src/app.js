@@ -153,6 +153,8 @@ export function initApp() {
       ui.controlsHeader.setAttribute('aria-expanded', String(expanded));
     });
 
+    wireControlsAreaResize(ui.controlsArea, ui.resizeHandle);
+
     document.querySelectorAll('.panel-header').forEach((header) => {
       header.addEventListener('click', () => {
         const panel = header.closest('.panel');
@@ -193,5 +195,76 @@ function bindUI() {
     btnExportGlb: document.getElementById('btn-export-glb'),
     controlsArea: document.getElementById('controls-area'),
     controlsHeader: document.querySelector('.controls-area-header'),
+    resizeHandle: document.querySelector('.controls-area-resize-handle'),
   };
+}
+
+const CONTROLS_AREA_MIN_HEIGHT_PX = 120;
+const CONTROLS_AREA_MAX_HEIGHT_RATIO = 1;
+
+function wireControlsAreaResize(controlsArea, resizeHandle) {
+  if (!controlsArea || !resizeHandle) return;
+
+  let startY = 0;
+  let startHeight = 0;
+
+  function applyHeight(clientY) {
+    const deltaY = startY - clientY;
+    const h = Math.max(
+      CONTROLS_AREA_MIN_HEIGHT_PX,
+      Math.min(window.innerHeight * CONTROLS_AREA_MAX_HEIGHT_RATIO, startHeight + deltaY)
+    );
+    controlsArea.style.setProperty('--controls-area-height', `${h}px`);
+  }
+
+  function stopResize() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    document.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('touchend', onTouchEnd);
+    document.removeEventListener('touchcancel', onTouchEnd);
+  }
+
+  function onMouseMove(e) {
+    applyHeight(e.clientY);
+  }
+
+  function onMouseUp() {
+    stopResize();
+  }
+
+  function onTouchMove(e) {
+    if (e.touches[0]) applyHeight(e.touches[0].clientY);
+  }
+
+  function onTouchEnd() {
+    stopResize();
+  }
+
+  function startResize(clientY) {
+    const rect = controlsArea.getBoundingClientRect();
+    startY = clientY;
+    startHeight = rect.height;
+    const currentVar = controlsArea.style.getPropertyValue('--controls-area-height').trim();
+    if (!currentVar) {
+      const defaultHeightPx = Math.round(Math.min(window.innerHeight, startHeight));
+      controlsArea.style.setProperty('--controls-area-height', `${defaultHeightPx}px`);
+    }
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('touchmove', onTouchMove, { passive: true });
+    document.addEventListener('touchend', onTouchEnd);
+    document.addEventListener('touchcancel', onTouchEnd);
+  }
+
+  resizeHandle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startResize(e.clientY);
+  });
+
+  resizeHandle.addEventListener('touchstart', (e) => {
+    if (e.cancelable) e.preventDefault();
+    const t = e.touches[0];
+    if (t) startResize(t.clientY);
+  }, { passive: false });
 }
