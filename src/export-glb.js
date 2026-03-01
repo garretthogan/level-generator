@@ -6,21 +6,73 @@ import { buildArenaMeshesForExport } from './preview/arena-mesh.js';
 import { buildFloorPlanMeshesForExport } from './preview/floor-plan-mesh.js';
 
 /**
- * Set world-space UVs on a mesh so tiling textures work correctly in external editors.
+ * Choose two world axes for UV from face normal (the two axes spanning the face).
+ * Returns [uAxis, vAxis] where each is 'x'|'y'|'z'.
+ */
+function uvAxesFromNormal(nx, ny, nz) {
+  const ax = Math.abs(nx);
+  const ay = Math.abs(ny);
+  const az = Math.abs(nz);
+  if (ax >= ay && ax >= az) return ['y', 'z']; // face in YZ
+  if (ay >= az) return ['x', 'z']; // face in XZ
+  return ['x', 'y']; // face in XY
+}
+
+/**
+ * Set world-space UVs per face so tiling textures work correctly on both floors and walls.
+ * Floors get U=X, V=Z; walls get U and V from the two axes spanning the face (e.g. X and Y).
+ * Vertices are duplicated so each face gets correct UVs (required for boxes).
  * @param {THREE.Mesh} mesh
  */
 function setWorldSpaceUVs(mesh) {
   const geo = mesh.geometry;
   if (!geo?.attributes?.position) return;
   const pos = geo.attributes.position;
-  const count = pos.count;
-  const uvs = new Float32Array(count * 2);
-  for (let i = 0; i < count; i++) {
-    uvs[i * 2] = pos.getX(i);
-    uvs[i * 2 + 1] = pos.getZ(i);
+  const index = geo.index;
+  const scale = 1;
+
+  const positions = [];
+  const uvs = [];
+  const getPos = (i) => ({
+    x: pos.getX(i),
+    y: pos.getY(i),
+    z: pos.getZ(i),
+  });
+
+  function addTriangle(i0, i1, i2) {
+    const p0 = getPos(i0);
+    const p1 = getPos(i1);
+    const p2 = getPos(i2);
+    const nx = (p1.y - p0.y) * (p2.z - p0.z) - (p1.z - p0.z) * (p2.y - p0.y);
+    const ny = (p1.z - p0.z) * (p2.x - p0.x) - (p1.x - p0.x) * (p2.z - p0.z);
+    const nz = (p1.x - p0.x) * (p2.y - p0.y) - (p1.y - p0.y) * (p2.x - p0.x);
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+    const [uAxis, vAxis] = uvAxesFromNormal(nx / len, ny / len, nz / len);
+    const getU = (p) => (uAxis === 'x' ? p.x : uAxis === 'y' ? p.y : p.z) * scale;
+    const getV = (p) => (vAxis === 'x' ? p.x : vAxis === 'y' ? p.y : p.z) * scale;
+    for (const p of [p0, p1, p2]) {
+      positions.push(p.x, p.y, p.z);
+      uvs.push(getU(p), getV(p));
+    }
   }
-  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-  if (geo.attributes.uv2) geo.deleteAttribute('uv2');
+
+  if (index) {
+    for (let i = 0; i < index.count; i += 3) {
+      addTriangle(index.getX(i), index.getX(i + 1), index.getX(i + 2));
+    }
+  } else {
+    for (let i = 0; i < pos.count; i += 3) {
+      addTriangle(i, i + 1, i + 2);
+    }
+  }
+
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  newGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  newGeo.computeVertexNormals();
+  if (geo.attributes.uv2) newGeo.deleteAttribute('uv2');
+  mesh.geometry.dispose();
+  mesh.geometry = newGeo;
 }
 
 /**
