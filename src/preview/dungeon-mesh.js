@@ -44,7 +44,14 @@ export function buildDungeonMeshes(steps, config, darkTextures = null) {
     group.add(new THREE.Mesh(fallbackGeo, FLOOR_MATERIAL));
   }
 
-  const wallMesh = buildWallMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ, darkTextures);
+  let exits = [];
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].exits) {
+      exits = steps[i].exits;
+      break;
+    }
+  }
+  const wallMesh = buildWallMesh(grid, dungeonWidth, dungeonHeight, offsetX, offsetZ, darkTextures, exits);
   if (wallMesh) group.add(wallMesh);
 
   const lights = buildRoomLights(rooms, offsetX, offsetZ);
@@ -120,7 +127,7 @@ function buildFloorMesh(grid, w, h, offsetX, offsetZ, darkTextures = null) {
   return new THREE.Mesh(merged, FLOOR_MATERIAL);
 }
 
-function buildWallMesh(grid, w, h, offsetX, offsetZ, darkTextures = null) {
+function buildWallMesh(grid, w, h, offsetX, offsetZ, darkTextures = null, exits = null) {
   const walls = [];
 
   const wallNS = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
@@ -134,22 +141,22 @@ function buildWallMesh(grid, w, h, offsetX, offsetZ, darkTextures = null) {
       const cz = y + 0.5 + offsetZ;
       const wy = WALL_HEIGHT / 2;
 
-      if (y === 0 || !grid[y - 1][x]) {
+      if ((y === 0 || !grid[y - 1][x]) && !isWallOnExit(x, y, 'n', w, h, exits)) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
         walls.push(g);
       }
-      if (y === h - 1 || !grid[y + 1][x]) {
+      if ((y === h - 1 || !grid[y + 1][x]) && !isWallOnExit(x, y, 's', w, h, exits)) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
         walls.push(g);
       }
-      if (x === 0 || !grid[y][x - 1]) {
+      if ((x === 0 || !grid[y][x - 1]) && !isWallOnExit(x, y, 'w', w, h, exits)) {
         const g = wallEW.clone();
         g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
         walls.push(g);
       }
-      if (x === w - 1 || !grid[y][x + 1]) {
+      if ((x === w - 1 || !grid[y][x + 1]) && !isWallOnExit(x, y, 'e', w, h, exits)) {
         const g = wallEW.clone();
         g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
         walls.push(g);
@@ -188,8 +195,32 @@ function buildRoomLights(rooms, offsetX, offsetZ) {
 }
 
 /**
+ * Returns true if a wall segment at (x, y) on the given side should be skipped because it lies on an exit.
+ * @param {number} x - Cell x (column)
+ * @param {number} y - Cell y (row)
+ * @param {'n'|'s'|'e'|'w'} side
+ * @param {number} width
+ * @param {number} height
+ * @param {{ side: string, x?: number, z?: number, span: number }[]} exits
+ */
+function isWallOnExit(x, y, side, width, height, exits) {
+  if (!exits?.length) return false;
+  for (const ex of exits) {
+    if (ex.side !== side) continue;
+    const start = side === 'n' || side === 's' ? ex.x : ex.z;
+    const span = ex.span ?? 1;
+    if (side === 'n' && y === 0 && x >= start && x < start + span) return true;
+    if (side === 's' && y === height - 1 && x >= start && x < start + span) return true;
+    if (side === 'w' && x === 0 && y >= start && y < start + span) return true;
+    if (side === 'e' && x === width - 1 && y >= start && y < start + span) return true;
+  }
+  return false;
+}
+
+/**
  * Build dungeon geometry as separate meshes (one per floor tile, one per wall segment)
  * for GLB export so each piece can be edited individually in another editor.
+ * If any step has step.exits, wall segments at those positions are omitted so exits stay open.
  * Returns only the group with mesh children; no lights.
  */
 export function buildDungeonMeshesForExport(steps, config) {
@@ -197,6 +228,14 @@ export function buildDungeonMeshesForExport(steps, config) {
   const grid = buildFloorGrid(steps, dungeonWidth, dungeonHeight);
   const offsetX = -dungeonWidth / 2;
   const offsetZ = -dungeonHeight / 2;
+
+  let exits = [];
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].exits) {
+      exits = steps[i].exits;
+      break;
+    }
+  }
 
   const group = new THREE.Group();
   group.name = 'dungeon';
@@ -225,28 +264,28 @@ export function buildDungeonMeshesForExport(steps, config) {
       const cz = y + 0.5 + offsetZ;
       const wy = WALL_HEIGHT / 2;
 
-      if (y === 0 || !grid[y - 1][x]) {
+      if ((y === 0 || !grid[y - 1][x]) && !isWallOnExit(x, y, 'n', dungeonWidth, dungeonHeight, exits)) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
         const m = new THREE.Mesh(g, WALL_MATERIAL);
         m.name = `Wall_${wallIndex++}`;
         group.add(m);
       }
-      if (y === dungeonHeight - 1 || !grid[y + 1][x]) {
+      if ((y === dungeonHeight - 1 || !grid[y + 1][x]) && !isWallOnExit(x, y, 's', dungeonWidth, dungeonHeight, exits)) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
         const m = new THREE.Mesh(g, WALL_MATERIAL);
         m.name = `Wall_${wallIndex++}`;
         group.add(m);
       }
-      if (x === 0 || !grid[y][x - 1]) {
+      if ((x === 0 || !grid[y][x - 1]) && !isWallOnExit(x, y, 'w', dungeonWidth, dungeonHeight, exits)) {
         const g = wallEW.clone();
         g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
         const m = new THREE.Mesh(g, WALL_MATERIAL);
         m.name = `Wall_${wallIndex++}`;
         group.add(m);
       }
-      if (x === dungeonWidth - 1 || !grid[y][x + 1]) {
+      if ((x === dungeonWidth - 1 || !grid[y][x + 1]) && !isWallOnExit(x, y, 'e', dungeonWidth, dungeonHeight, exits)) {
         const g = wallEW.clone();
         g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
         const m = new THREE.Mesh(g, WALL_MATERIAL);

@@ -11,6 +11,8 @@ const PALETTE = {
   corridorStroke: 'rgba(0, 212, 255, 0.28)',
   corridorActiveFill: 'rgba(0, 212, 255, 0.22)',
   corridorActiveStroke: 'rgba(0, 212, 255, 0.65)',
+  exitFill: 'rgba(111, 227, 139, 0.35)',
+  exitStroke: '#6de38b',
   spawnMarker: '#ff69b4',
 };
 
@@ -125,11 +127,9 @@ function drawBoundary(ctx, boundary, exits, px, py, sc) {
 
 function drawExits(ctx, exits, boundary, px, py, sc) {
   if (!exits?.length || !boundary) return;
-  ctx.fillStyle = PALETTE.corridorFill;
-  ctx.strokeStyle = PALETTE.corridorStroke;
-  ctx.lineWidth = 0.5;
   const w = boundary.width;
   const h = boundary.height;
+  ctx.lineWidth = 2;
   for (const ex of exits) {
     let rx, ry, rw, rh;
     if (ex.side === 'n') {
@@ -153,7 +153,9 @@ function drawExits(ctx, exits, boundary, px, py, sc) {
       rw = 1;
       rh = ex.span;
     } else continue;
+    ctx.fillStyle = PALETTE.exitFill;
     ctx.fillRect(px(rx), py(ry), sc(rw), sc(rh));
+    ctx.strokeStyle = PALETTE.exitStroke;
     ctx.strokeRect(px(rx), py(ry), sc(rw), sc(rh));
   }
 }

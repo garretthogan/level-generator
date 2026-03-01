@@ -21,8 +21,66 @@ export function generateDungeon(config) {
   partition(root, config, rng, steps);
   placeAllRooms(root, config, rng, steps);
   connectAllCorridors(root, config, steps);
+  addDefaultExits(config, rng, steps, root);
 
   return steps;
+}
+
+/** Cut an exit (hole) in one or two random rooms that touch the boundary. */
+function addDefaultExits(config, rng, steps, root) {
+  const w = config.dungeonWidth;
+  const h = config.dungeonHeight;
+  const rooms = collectLeaves(root).filter((n) => n.room).map((n) => n.room);
+  const onBoundary = rooms.filter((r) => r.y === 0 || r.y + r.height === h || r.x === 0 || r.x + r.width === w);
+  const exits = [];
+
+  if (onBoundary.length >= 2) {
+    const [a, b] = pickTwoDifferent(onBoundary, rng);
+    cutExitInRoom(a, w, h, rng, exits);
+    cutExitInRoom(b, w, h, rng, exits);
+  } else if (onBoundary.length === 1) {
+    cutExitInRoom(onBoundary[0], w, h, rng, exits);
+  } else if (rooms.length >= 2) {
+    const [a, b] = pickTwoDifferent(rooms, rng);
+    cutExitInRoom(a, w, h, rng, exits);
+    cutExitInRoom(b, w, h, rng, exits);
+  } else if (rooms.length === 1) {
+    cutExitInRoom(rooms[0], w, h, rng, exits);
+  }
+  if (exits.length === 0) {
+    const span = Math.max(2, Math.min(4, Math.floor(w / 4)));
+    exits.push({ side: 'n', x: Math.floor(rng() * Math.max(0, w - span + 1)), span });
+  }
+
+  steps.push({ phase: StepPhase.CORRIDORS, label: 'Exits', exits });
+}
+
+function pickTwoDifferent(rooms, rng) {
+  const a = Math.floor(rng() * rooms.length);
+  let b = Math.floor(rng() * rooms.length);
+  while (b === a && rooms.length > 1) b = Math.floor(rng() * rooms.length);
+  return [rooms[a], rooms[b]];
+}
+
+/** If room touches the boundary, cut one exit (hole) in that wall. */
+function cutExitInRoom(room, w, h, rng, exits) {
+  const sides = [];
+  if (room.y === 0 && room.width >= 2) sides.push('n');
+  if (room.y + room.height === h && room.width >= 2) sides.push('s');
+  if (room.x === 0 && room.height >= 2) sides.push('w');
+  if (room.x + room.width === w && room.height >= 2) sides.push('e');
+  if (sides.length === 0) return;
+  const side = sides[Math.floor(rng() * sides.length)];
+  const span = Math.max(2, Math.min(4, side === 'n' || side === 's' ? room.width : room.height));
+  if (side === 'n' || side === 's') {
+    const maxStart = room.x + room.width - span;
+    const start = room.x + (maxStart <= room.x ? 0 : Math.floor(rng() * (maxStart - room.x + 1)));
+    exits.push({ side, x: start, span });
+  } else {
+    const maxStart = room.y + room.height - span;
+    const start = room.y + (maxStart <= room.y ? 0 : Math.floor(rng() * (maxStart - room.y + 1)));
+    exits.push({ side, z: start, span });
+  }
 }
 
 function createNode(x, y, width, height, depth) {
@@ -89,22 +147,29 @@ function placeAllRooms(root, config, rng, steps) {
 
 function placeRoom(leaf, config, rng, steps) {
   const padding = config.roomPadding;
-  const maxW = leaf.width - padding * 2;
-  const maxH = leaf.height - padding * 2;
+  const w = config.dungeonWidth;
+  const h = config.dungeonHeight;
+  // No padding on sides where the leaf touches the dungeon boundary so rooms can have exits there
+  const padW = leaf.x === 0 ? 0 : padding;
+  const padE = leaf.x + leaf.width === w ? 0 : padding;
+  const padN = leaf.y === 0 ? 0 : padding;
+  const padS = leaf.y + leaf.height === h ? 0 : padding;
+  const maxW = leaf.width - padW - padE;
+  const maxH = leaf.height - padN - padS;
 
   if (maxW < config.minRoomSize || maxH < config.minRoomSize) return;
 
-  const w = Math.max(config.minRoomSize, Math.floor(config.minRoomSize + rng() * (maxW - config.minRoomSize)));
-  const h = Math.max(config.minRoomSize, Math.floor(config.minRoomSize + rng() * (maxH - config.minRoomSize)));
-  const x = Math.floor(leaf.x + padding + rng() * Math.max(0, maxW - w));
-  const y = Math.floor(leaf.y + padding + rng() * Math.max(0, maxH - h));
+  const roomW = Math.max(config.minRoomSize, Math.floor(config.minRoomSize + rng() * (maxW - config.minRoomSize)));
+  const roomH = Math.max(config.minRoomSize, Math.floor(config.minRoomSize + rng() * (maxH - config.minRoomSize)));
+  const x = Math.floor(leaf.x + padW + rng() * Math.max(0, maxW - roomW));
+  const y = Math.floor(leaf.y + padN + rng() * Math.max(0, maxH - roomH));
 
-  leaf.room = { x, y, width: w, height: h };
+  leaf.room = { x, y, width: roomW, height: roomH };
 
   steps.push({
     phase: StepPhase.ROOMS,
-    label: `Room at (${x}, ${y}) ${w}\u00d7${h}`,
-    room: { x, y, width: w, height: h },
+    label: `Room at (${x}, ${y}) ${roomW}\u00d7${roomH}`,
+    room: { x, y, width: roomW, height: roomH },
   });
 }
 

@@ -134,22 +134,23 @@ function buildArenaWallMesh(grid, cols, rows, offsetX, offsetZ, darkTextures = n
       const cz = z + 0.5 + offsetZ;
       const wy = WALL_HEIGHT / 2;
 
-      if (z === 0 || grid[x][z - 1] === 1) {
+      /* Only add wall when neighbor in that direction is wall; skip boundary so exits stay open */
+      if (z > 0 && grid[x][z - 1] === 1) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
         walls.push(g);
       }
-      if (z === rows - 1 || grid[x][z + 1] === 1) {
+      if (z < rows - 1 && grid[x][z + 1] === 1) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
         walls.push(g);
       }
-      if (x === 0 || grid[x - 1][z] === 1) {
+      if (x > 0 && grid[x - 1][z] === 1) {
         const g = wallEW.clone();
         g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
         walls.push(g);
       }
-      if (x === cols - 1 || grid[x + 1][z] === 1) {
+      if (x < cols - 1 && grid[x + 1][z] === 1) {
         const g = wallEW.clone();
         g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
         walls.push(g);
@@ -249,28 +250,29 @@ export function buildArenaMeshesForExport(arenaResult) {
       const cz = z + 0.5 + offsetZ;
       const wy = WALL_HEIGHT / 2;
 
-      if (z === 0 || grid[x][z - 1] === 1) {
+      /* Only add wall when neighbor in that direction is wall; skip boundary so exits stay open */
+      if (z > 0 && grid[x][z - 1] === 1) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz - 0.5 + WALL_THICKNESS / 2);
         const m = new THREE.Mesh(g, WALL_MATERIAL);
         m.name = `Wall_${wallIndex++}`;
         group.add(m);
       }
-      if (z === rows - 1 || grid[x][z + 1] === 1) {
+      if (z < rows - 1 && grid[x][z + 1] === 1) {
         const g = wallNS.clone();
         g.translate(cx, wy, cz + 0.5 - WALL_THICKNESS / 2);
         const m = new THREE.Mesh(g, WALL_MATERIAL);
         m.name = `Wall_${wallIndex++}`;
         group.add(m);
       }
-      if (x === 0 || grid[x - 1][z] === 1) {
+      if (x > 0 && grid[x - 1][z] === 1) {
         const g = wallEW.clone();
         g.translate(cx - 0.5 + WALL_THICKNESS / 2, wy, cz);
         const m = new THREE.Mesh(g, WALL_MATERIAL);
         m.name = `Wall_${wallIndex++}`;
         group.add(m);
       }
-      if (x === cols - 1 || grid[x + 1][z] === 1) {
+      if (x < cols - 1 && grid[x + 1][z] === 1) {
         const g = wallEW.clone();
         g.translate(cx + 0.5 - WALL_THICKNESS / 2, wy, cz);
         const m = new THREE.Mesh(g, WALL_MATERIAL);
