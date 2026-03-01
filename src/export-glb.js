@@ -76,61 +76,68 @@ function setWorldSpaceUVs(mesh) {
 }
 
 /**
- * Builds a Three.js group with one mesh per floor tile and per wall segment
- * so each piece can be edited individually in another editor.
+ * Builds an export group with floor and wall sibling groups; each mesh is
+ * cloned, given world-space UVs, and placed under the appropriate child group.
+ * @param {THREE.Group} group - Source group with mesh children named Floor_* / Wall_*
+ * @param {string} rootName - Name for the root export group (e.g. 'dungeon', 'arena')
+ * @returns {THREE.Group}
  */
-function buildDungeonGroupForExport(steps, config) {
-  const { group } = buildDungeonMeshesForExport(steps, config);
+function buildExportGroupWithFloorAndWallGroups(group, rootName) {
   const exportGroup = new THREE.Group();
-  exportGroup.name = 'dungeon';
+  exportGroup.name = rootName;
+  const floorGroup = new THREE.Group();
+  floorGroup.name = 'floor';
+  const wallGroup = new THREE.Group();
+  wallGroup.name = 'wall';
+
   for (const child of group.children) {
     if (!child.isMesh) continue;
     const clone = child.clone();
     clone.material = child.material.clone();
-    clone.material.name = child.name.startsWith('Floor') ? 'Floor' : 'Wall';
+    const isFloor = child.name.startsWith('Floor');
+    clone.material.name = isFloor ? 'Floor' : 'Wall';
     setWorldSpaceUVs(clone);
-    exportGroup.add(clone);
+    if (isFloor) floorGroup.add(clone);
+    else wallGroup.add(clone);
   }
+
+  exportGroup.add(floorGroup);
+  exportGroup.add(wallGroup);
   return exportGroup;
 }
 
 /**
  * Builds a Three.js group with one mesh per floor tile and per wall segment
  * so each piece can be edited individually in another editor.
+ * Structure: dungeon → floor (meshes), wall (meshes).
+ */
+function buildDungeonGroupForExport(steps, config) {
+  const { group } = buildDungeonMeshesForExport(steps, config);
+  return buildExportGroupWithFloorAndWallGroups(group, 'dungeon');
+}
+
+/**
+ * Builds a Three.js group with one mesh per floor tile and per wall segment
+ * so each piece can be edited individually in another editor.
+ * Structure: arena → floor (meshes), wall (meshes).
  */
 function buildArenaGroupForExport(arenaResult) {
   const { group } = buildArenaMeshesForExport(arenaResult);
-  const exportGroup = new THREE.Group();
-  exportGroup.name = 'arena';
-  for (const child of group.children) {
-    if (!child.isMesh) continue;
-    const clone = child.clone();
-    clone.material = child.material.clone();
-    clone.material.name = child.name.startsWith('Floor') ? 'Floor' : 'Wall';
-    setWorldSpaceUVs(clone);
-    exportGroup.add(clone);
-  }
-  return exportGroup;
+  return buildExportGroupWithFloorAndWallGroups(group, 'arena');
 }
 
+/**
+ * Builds a Three.js group for floor plan export.
+ * Structure: floor-plan → floor (meshes), wall (meshes).
+ */
 function buildFloorPlanGroupForExport(plan) {
   const { group } = buildFloorPlanMeshesForExport(plan);
-  const exportGroup = new THREE.Group();
-  exportGroup.name = 'floor-plan';
-  for (const child of group.children) {
-    if (!child.isMesh) continue;
-    const clone = child.clone();
-    clone.material = child.material.clone();
-    clone.material.name = child.name.startsWith('Floor') ? 'Floor' : 'Wall';
-    setWorldSpaceUVs(clone);
-    exportGroup.add(clone);
-  }
-  return exportGroup;
+  return buildExportGroupWithFloorAndWallGroups(group, 'floor-plan');
 }
 
 /**
  * Exports the current dungeon as a binary GLB file and triggers a download.
- * Each floor tile and each wall segment is a separate mesh (Floor_0_0, Floor_0_1, Wall_0, Wall_1, …)
+ * Structure: dungeon → floor (floor meshes), wall (wall meshes). Each tile/segment is a separate mesh
  * so you can select and edit individual pieces in Unreal, Blender, etc. Materials are named Floor / Wall.
  *
  * @param {Object} config - Dungeon config (dungeonWidth, seed, etc.)
@@ -154,8 +161,7 @@ export async function exportDungeonAsGLB(config, steps = null) {
 
 /**
  * Exports the current arena as a binary GLB file and triggers a download.
- * Each floor tile and each wall segment is a separate mesh (Floor_0_0, Wall_0, …)
- * so you can select and edit individual pieces in Unreal, Blender, etc. Materials are named Floor / Wall.
+ * Structure: arena → floor (floor meshes), wall (wall meshes). Materials are named Floor / Wall.
  *
  * @param {Object} arenaResult - Result from generateArena(options) (grids, spawns, flags, etc.)
  */
