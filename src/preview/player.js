@@ -1,8 +1,11 @@
-// Ref: https://threejs.org/docs/pages/PointerLockControls.html
+// Quake-style FPS: WASD + mouse look, Shift to sprint, raw mouse input.
+// Ref: https://threejs.org/docs/#examples/en/controls/PointerLockControls
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-const MOVE_SPEED = 8;
+const MOVE_SPEED = 7;
+const SPRINT_MULTIPLIER = 1.65;
 const COLLISION_MARGIN = 0.3;
+const POINTER_SPEED = 2.2;
 
 function segmentsIntersect(a1x, a1z, a2x, a2z, b1x, b1z, b2x, b2z) {
   const dxa = a2x - a1x;
@@ -18,11 +21,12 @@ function segmentsIntersect(a1x, a1z, a2x, a2z, b1x, b1z, b2x, b2z) {
 
 export function createPlayer(camera, domElement, floorGrid, offsetX, offsetZ, wallSegments = null) {
   const controls = new PointerLockControls(camera, domElement);
+  controls.pointerSpeed = POINTER_SPEED;
   const keys = new Set();
   const walls = Array.isArray(wallSegments) ? wallSegments : [];
 
   domElement.addEventListener('click', () => {
-    if (!controls.isLocked) controls.lock();
+    if (!controls.isLocked) controls.lock(true);
   });
 
   document.addEventListener('keydown', (e) => keys.add(e.code));
@@ -55,7 +59,9 @@ export function createPlayer(camera, domElement, floorGrid, offsetX, offsetZ, wa
   function update(dt) {
     if (!controls.isLocked) return;
 
-    const distance = MOVE_SPEED * dt;
+    const sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    const speed = MOVE_SPEED * (sprint ? SPRINT_MULTIPLIER : 1);
+    const distance = speed * dt;
 
     let forward = 0;
     let right = 0;
